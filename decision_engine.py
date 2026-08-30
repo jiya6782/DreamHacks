@@ -1,7 +1,9 @@
 """Combines environmental conditions, supply levels, and user priorities."""
 
+from typing import Any, Dict
 
-def energy_potential(environment):
+
+def energy_potential(environment: Dict[str, Any]) -> Dict[str, Any]:
     solar_kw = round(environment["solar_radiation"] / 1000 * 4.0, 2)
     wind_kw = round(min(environment["wind_speed"] / 12, 1.5) * 1.8, 2)
     return {"solar_kw": solar_kw, "wind_kw": wind_kw, "total_kw": round(solar_kw + wind_kw, 2), "solar_level": "High" if solar_kw >= 2.5 else "Moderate" if solar_kw >= 1 else "Low", "wind_level": "High" if wind_kw >= 1.5 else "Moderate" if wind_kw >= 0.8 else "Low"}
