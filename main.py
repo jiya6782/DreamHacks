@@ -136,15 +136,42 @@ for resource in st.session_state.resources:
 
 
 # --------------------------------------------------
-# Decision
+# Energy
 # --------------------------------------------------
 
-st.subheader("Decision")
+st.subheader("⚡ Renewable Energy Potential")
 
-if isinstance(decision, dict):
-    st.json(decision)
-else:
-    st.write(decision)
+energy = decision["energy"]
+
+col1, col2, col3 = st.columns(3)
+
+col1.metric(
+    "Solar",
+    f'{energy["solar_kw"]} kW',
+    energy["solar_level"]
+)
+
+col2.metric(
+    "Wind",
+    f'{energy["wind_kw"]} kW',
+    energy["wind_level"]
+)
+
+col3.metric(
+    "Total Available",
+    f'{energy["total_kw"]} kW'
+)
+
+
+# --------------------------------------------------
+# Recommended Actions
+# --------------------------------------------------
+
+st.subheader("📋 Recommended Next Actions")
+
+for i, recommendation in enumerate(decision["recommendations"], start=1):
+    st.markdown(f"### {i}. {recommendation['title']}")
+    st.write(recommendation["detail"])
 
 
 # --------------------------------------------------
