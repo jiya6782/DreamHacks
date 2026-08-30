@@ -1,1 +1,2 @@
 # DreamHacks
+print("Hello")
