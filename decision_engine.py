@@ -1,23 +1,18 @@
-"""Decision engine for island energy and resource management."""
+"""Decision engine for the Isla resource management system.
 
-import re
-from typing import Any, Dict, List, Optional
+Combines environmental conditions, detected environmental events,
+resource levels, energy availability, and user priorities.
+"""
 
-
-SEVERITY_RANK = {
-    "Normal": 1,
-    "Moderate": 2,
-    "High": 3,
-    "Critical": 4,
-}
+from typing import Any, Dict
 
 
-# --------------------------------------------------
-# ENERGY CALCULATION
-# --------------------------------------------------
+# ==========================================================
+# ENERGY
+# ==========================================================
 
 def energy_potential(environment: Dict[str, Any]) -> Dict[str, Any]:
-    """Estimate renewable energy available from solar and wind."""
+    """Estimate renewable energy production from current conditions."""
 
     solar_kw = round(
         environment["solar_radiation"] / 1000 * 4.0,
@@ -52,322 +47,252 @@ def energy_potential(environment: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-# --------------------------------------------------
-# ENVIRONMENTAL EVENT DETECTION (primary / unchanged)
-# --------------------------------------------------
+# ==========================================================
+# ENVIRONMENTAL EVENT DETECTION
+# ==========================================================
 
-def detect_environmental_event(
-    environment: Dict[str, Any],
-) -> Dict[str, Any]:
+def detect_event(environment: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Analyze sensor data and determine whether a significant
-    environmental condition or disaster is occurring.
+    Analyze multiple environmental signals and determine
+    whether a significant environmental event is occurring.
 
-    This returns the single highest-priority *environmental*
-    (weather/sensor) event. Resource-driven conditions (e.g. a
-    water shortage) are layered on separately in
-    `detect_resource_conditions` and combined in `build_decision`
-    so this function's behavior/contract stays stable.
+    The system does not rely on one sensor alone. Instead,
+    multiple signals contribute to an event confidence score.
     """
 
-    temperature = float(environment.get("temperature", 0))
-    solar = float(environment.get("solar_radiation", 0))
-    wind = float(environment.get("wind_speed", 0))
-    rainfall = float(environment.get("rainfall", 0))
-    weather = str(environment.get("weather", "")).lower()
+    solar = float(environment["solar_radiation"])
+    wind = float(environment["wind_speed"])
+    temperature = float(environment["temperature"])
+    weather = str(environment["weather"]).lower()
 
-    # ----------------------------------------------
+    # ------------------------------------------------------
     # STORM
-    # ----------------------------------------------
+    # ------------------------------------------------------
 
-    if (
-        rainfall >= 5
-        and wind >= 12
-    ) or (
-        weather == "storm"
-    ):
+    storm_score = 0
+    storm_signals = []
+
+    if wind >= 12:
+        storm_score += 40
+        storm_signals.append(
+            f"High wind: {wind} m/s"
+        )
+
+    if "rain" in weather:
+        storm_score += 35
+        storm_signals.append(
+            "Rain detected"
+        )
+
+    if "cloud" in weather or "storm" in weather:
+        storm_score += 15
+        storm_signals.append(
+            "Heavy cloud cover"
+        )
+
+    if temperature <= 25:
+        storm_score += 10
+        storm_signals.append(
+            f"Cool temperature: {temperature}°C"
+        )
+
+    if storm_score >= 70:
         return {
             "event": "Storm",
-            "severity": "Critical",
-            "icon": "🌪️",
-            "description": (
-                "Heavy rainfall and high winds indicate "
-                "a storm is affecting the island."
-            ),
+            "severity": "High",
+            "confidence": min(storm_score, 100),
             "reason": (
-                f"Rainfall: {rainfall} mm/h + "
-                f"Wind: {wind} m/s"
+                "Multiple environmental signals indicate "
+                "that a storm is occurring or approaching."
             ),
+            "signals": storm_signals,
         }
 
-    # ----------------------------------------------
+    # ------------------------------------------------------
     # HEATWAVE
-    # ----------------------------------------------
+    # ------------------------------------------------------
 
-    if (
-        temperature >= 29
-        and solar >= 800
-    ):
+    heat_score = 0
+    heat_signals = []
+
+    if temperature >= 32:
+        heat_score += 50
+        heat_signals.append(
+            f"High temperature: {temperature}°C"
+        )
+
+    if solar >= 850:
+        heat_score += 35
+        heat_signals.append(
+            f"Extreme solar radiation: {solar} W/m²"
+        )
+
+    if wind <= 5:
+        heat_score += 15
+        heat_signals.append(
+            f"Low wind: {wind} m/s"
+        )
+
+    if heat_score >= 70:
         return {
             "event": "Heatwave",
             "severity": "High",
-            "icon": "🔥",
-            "description": (
-                "Extreme heat combined with intense solar "
-                "radiation indicates a heatwave."
-            ),
+            "confidence": min(heat_score, 100),
             "reason": (
-                f"Temperature: {temperature}°C + "
-                f"Solar radiation: {solar} W/m²"
+                "High temperature combined with strong "
+                "solar radiation indicates heatwave conditions."
             ),
+            "signals": heat_signals,
         }
 
-    # ----------------------------------------------
+    # ------------------------------------------------------
     # HEAVY RAIN
-    # ----------------------------------------------
+    # ------------------------------------------------------
 
-    if rainfall >= 8:
+    rain_score = 0
+    rain_signals = []
+
+    if "rain" in weather:
+        rain_score += 70
+        rain_signals.append(
+            "Rain detected"
+        )
+
+    if wind >= 8:
+        rain_score += 20
+        rain_signals.append(
+            f"Elevated wind: {wind} m/s"
+        )
+
+    if solar < 500:
+        rain_score += 10
+        rain_signals.append(
+            "Low solar radiation"
+        )
+
+    if rain_score >= 70:
         return {
             "event": "Heavy Rain",
             "severity": "Moderate",
-            "icon": "🌧️",
-            "description": (
-                "Heavy rainfall has been detected. "
-                "Water collection can be prioritized."
+            "confidence": min(rain_score, 100),
+            "reason": (
+                "Rain and reduced environmental energy "
+                "conditions indicate heavy rainfall."
             ),
-            "reason": f"Rainfall: {rainfall} mm/h",
+            "signals": rain_signals,
         }
 
-    # ----------------------------------------------
+    # ------------------------------------------------------
     # HIGH WIND
-    # ----------------------------------------------
+    # ------------------------------------------------------
 
-    if wind >= 15:
+    if wind >= 12:
         return {
             "event": "High Wind",
             "severity": "Moderate",
-            "icon": "🌬️",
-            "description": (
-                "Strong winds may require protection "
-                "of infrastructure and equipment."
+            "confidence": 85,
+            "reason": (
+                f"Wind speed has reached {wind} m/s, "
+                "creating potentially hazardous conditions."
             ),
-            "reason": f"Wind speed: {wind} m/s",
+            "signals": [
+                f"Wind speed: {wind} m/s"
+            ],
         }
 
-    # ----------------------------------------------
-    # HIGH SOLAR
-    # ----------------------------------------------
+    # ------------------------------------------------------
+    # EXTREME SOLAR
+    # ------------------------------------------------------
 
     if solar >= 900:
         return {
             "event": "Extreme Solar",
             "severity": "Moderate",
-            "icon": "☀️",
-            "description": (
-                "Very high solar radiation creates "
-                "increased cooling and water demand."
+            "confidence": 90,
+            "reason": (
+                f"Solar radiation has reached {solar} W/m²."
             ),
-            "reason": f"Solar radiation: {solar} W/m²",
+            "signals": [
+                f"Solar radiation: {solar} W/m²"
+            ],
         }
 
-    # ----------------------------------------------
+    # ------------------------------------------------------
     # NORMAL
-    # ----------------------------------------------
+    # ------------------------------------------------------
 
     return {
-        "event": "Normal Conditions",
-        "severity": "Normal",
-        "icon": "🟢",
-        "description": (
+        "event": "Normal",
+        "severity": "Low",
+        "confidence": 98,
+        "reason": (
             "No significant environmental threat "
-            "has been detected."
+            "was detected."
         ),
-        "reason": "All monitored conditions are within normal ranges.",
+        "signals": [],
     }
 
 
-# --------------------------------------------------
-# RESOURCE-DRIVEN CONDITIONS (compounding layer)
-# --------------------------------------------------
-
-def detect_resource_conditions(
-    resources: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
-    """
-    Detect shortages driven by the resource ledger itself, independent
-    of weather. These can *stack* with an environmental event (e.g. a
-    Storm arriving during an existing Water Shortage is materially
-    worse than either condition alone), which a simple if/elif chain
-    over a single "event" can't represent.
-    """
-
-    conditions = []
-
-    for resource in resources:
-
-        name = str(resource.get("name", "")).lower()
-        category = str(resource.get("category", "")).lower()
-        quantity = max(float(resource.get("quantity", 0)), 0)
-        unit = resource.get("unit", "")
-
-        if ("water" in name or category == "water") and quantity < 500:
-            conditions.append({
-                "name": "Water Shortage",
-                "icon": "💧",
-                "severity": "High",
-                "resource": resource["name"],
-                "detail": (
-                    f"{resource['name']} at {quantity} {unit} is "
-                    f"below the 500-{unit or 'unit'} safety threshold."
-                ),
-            })
-
-        elif ("fuel" in name or category == "fuel") and quantity < 150:
-            conditions.append({
-                "name": "Fuel Shortage",
-                "icon": "⛽",
-                "severity": "Moderate",
-                "resource": resource["name"],
-                "detail": (
-                    f"{resource['name']} at {quantity} {unit} is "
-                    "running low."
-                ),
-            })
-
-        elif (
-            "shelter" in name or "housing" in name
-        ) and quantity < 15:
-            conditions.append({
-                "name": "Shelter Shortage",
-                "icon": "🏠",
-                "severity": "High",
-                "resource": resource["name"],
-                "detail": (
-                    f"{resource['name']} capacity ({quantity} {unit}) "
-                    "may not cover the population if conditions worsen."
-                ),
-            })
-
-        elif ("food" in name or category == "food") and quantity < 150:
-            conditions.append({
-                "name": "Food Shortage",
-                "icon": "🍽️",
-                "severity": "Moderate",
-                "resource": resource["name"],
-                "detail": (
-                    f"{resource['name']} at {quantity} {unit} is "
-                    "running low."
-                ),
-            })
-
-    return conditions
-
-
-def combine_event(
-    primary_event: Dict[str, Any],
-    resource_conditions: List[Dict[str, Any]],
-) -> Dict[str, Any]:
-    """
-    Merge the primary environmental event with any active resource
-    conditions into a single display-ready picture, without mutating
-    the original `event`/`severity` fields that existing callers and
-    tests rely on.
-    """
-
-    combined = dict(primary_event)
-
-    combined_severity = primary_event["severity"]
-    for condition in resource_conditions:
-        if SEVERITY_RANK[condition["severity"]] > SEVERITY_RANK[combined_severity]:
-            combined_severity = condition["severity"]
-
-    title_parts = [f"{primary_event['icon']} {primary_event['event']}"]
-    title_parts += [
-        f"{c['icon']} {c['name']}" for c in resource_conditions
-    ]
-
-    combined["compound_conditions"] = resource_conditions
-    combined["combined_severity"] = combined_severity
-    combined["display_title"] = " + ".join(title_parts)
-    combined["is_compound"] = len(resource_conditions) > 0
-
-    return combined
-
-
-# --------------------------------------------------
-# PREDICTIVE DEPLETION FORECAST
-# --------------------------------------------------
-
-def estimate_hours_remaining(resource: Dict[str, Any]) -> Optional[float]:
-    """
-    Turn a resource's stated `horizon` (e.g. "4.0 days", "18 hours")
-    into hours-remaining, if the ledger provides one. Returns None
-    when no horizon is available so callers can skip forecasting
-    for resources that don't track it.
-    """
-
-    horizon = resource.get("horizon")
-
-    if not horizon:
-        return None
-
-    match = re.match(
-        r"\s*([\d.]+)\s*(day|hour|hr)",
-        str(horizon).lower(),
-    )
-
-    if not match:
-        return None
-
-    value = float(match.group(1))
-    unit = match.group(2)
-
-    return value * 24 if unit == "day" else value
-
-
-def forecast_resource(resource: Dict[str, Any]) -> Dict[str, Any]:
-    """Build a small predictive summary for one resource."""
-
-    hours_remaining = estimate_hours_remaining(resource)
-
-    if hours_remaining is None:
-        return {"hours_remaining": None, "urgency": "Unknown", "urgency_bonus": 0}
-
-    if hours_remaining < 24:
-        urgency, bonus = "Critical", 4
-    elif hours_remaining < 72:
-        urgency, bonus = "Elevated", 2
-    elif hours_remaining < 168:
-        urgency, bonus = "Watch", 1
-    else:
-        urgency, bonus = "Stable", 0
-
-    return {
-        "hours_remaining": hours_remaining,
-        "urgency": urgency,
-        "urgency_bonus": bonus,
-    }
-
-
-# --------------------------------------------------
-# RESOURCE SCORING
-# --------------------------------------------------
+# ==========================================================
+# RESOURCE PRIORITY
+# ==========================================================
 
 def build_decision(environment, resources):
 
     energy = energy_potential(environment)
 
-    primary_event = detect_environmental_event(environment)
-    resource_conditions = detect_resource_conditions(resources)
-    event = combine_event(primary_event, resource_conditions)
+    event = detect_event(environment)
 
-    shortage_resource_names = {
-        c["resource"] for c in resource_conditions
+    # ------------------------------------------------------
+    # Event-specific priority adjustments
+    # ------------------------------------------------------
+
+    event_priority_boosts = {
+
+        "Storm": {
+            "shelter": 6,
+            "water": 4,
+            "food": 3,
+            "fuel": 2,
+            "supplies": 2,
+            "medical": 4,
+        },
+
+        "Heatwave": {
+            "water": 6,
+            "shelter": 4,
+            "food": 2,
+            "medical": 3,
+        },
+
+        "Heavy Rain": {
+            "shelter": 4,
+            "water": 2,
+            "food": 2,
+            "fuel": 1,
+            "supplies": 2,
+        },
+
+        "High Wind": {
+            "shelter": 4,
+            "fuel": 2,
+            "supplies": 2,
+        },
+
+        "Extreme Solar": {
+            "water": 3,
+            "shelter": 2,
+        },
     }
 
-    # ----------------------------------------------
-    # RESOURCE RANKING
-    # ----------------------------------------------
+    boosts = event_priority_boosts.get(
+        event["event"],
+        {},
+    )
+
+    # ------------------------------------------------------
+    # Rank resources
+    # ------------------------------------------------------
 
     ranked = []
 
@@ -378,123 +303,48 @@ def build_decision(environment, resources):
             0,
         )
 
-        priority = int(resource["priority"])
-
+        # Scarcity increases importance as supplies decrease.
         scarcity = 1 / max(quantity, 1)
 
-        base_score = priority
-        scarcity_bonus = round(
-            priority * min(scarcity * 100, 1.5),
-            2,
+        base_score = (
+            resource["priority"]
+            * (1 + min(scarcity * 100, 1.5))
         )
 
-        name = resource["name"].lower()
-        category = resource.get(
-            "category",
-            "",
-        ).lower()
+        resource_name = (
+            resource["name"].lower()
+        )
 
-        heat_bonus = 0
-        event_bonus = 0
-        shortage_bonus = 0
+        # --------------------------------------------------
+        # Find event-related priority boost
+        # --------------------------------------------------
 
-        # ------------------------------------------
-        # WATER + HEAT
-        # ------------------------------------------
+        event_boost = 0
+
+        for keyword, boost in boosts.items():
+
+            if keyword in resource_name:
+                event_boost = boost
+                break
+
+        score = base_score + event_boost
+
+        # --------------------------------------------------
+        # Heat increases water importance
+        # --------------------------------------------------
 
         if (
-            ("water" in name or category == "water")
+            "water" in resource_name
             and environment["temperature"] >= 27
         ):
-            heat_bonus += 3
-
-        # ------------------------------------------
-        # EVENT-SPECIFIC PRIORITIES
-        # ------------------------------------------
-
-        if primary_event["event"] == "Storm":
-
-            if (
-                "shelter" in name
-                or "housing" in name
-                or category == "general"
-            ):
-                event_bonus += 8
-
-            if "fuel" in name:
-                event_bonus += 5
-
-            if "water" in name:
-                event_bonus += 3
-
-        elif primary_event["event"] == "Heatwave":
-
-            if "water" in name:
-                event_bonus += 8
-
-            if "food" in name:
-                event_bonus += 2
-
-        elif primary_event["event"] == "Heavy Rain":
-
-            if "water" in name:
-                event_bonus += 4
-
-        elif primary_event["event"] == "High Wind":
-
-            if (
-                "shelter" in name
-                or "housing" in name
-                or category == "general"
-            ):
-                event_bonus += 5
-
-            if "fuel" in name:
-                event_bonus += 3
-
-        elif primary_event["event"] == "Extreme Solar":
-
-            if "water" in name:
-                event_bonus += 4
-
-        # ------------------------------------------
-        # RESOURCE-DRIVEN SHORTAGE BUMP
-        # ------------------------------------------
-
-        if resource["name"] in shortage_resource_names:
-            shortage_bonus += 3
-
-        # ------------------------------------------
-        # PREDICTIVE DEPLETION FORECAST
-        # ------------------------------------------
-
-        forecast = forecast_resource(resource)
-        urgency_bonus = forecast["urgency_bonus"]
-
-        score = round(
-            base_score
-            + scarcity_bonus
-            + heat_bonus
-            + event_bonus
-            + shortage_bonus
-            + urgency_bonus,
-            2,
-        )
+            score += 3
 
         ranked.append(
             {
                 **resource,
-                "score": score,
-                "forecast": forecast,
-                "breakdown": {
-                    "base_priority": base_score,
-                    "scarcity_bonus": scarcity_bonus,
-                    "heat_bonus": heat_bonus,
-                    "event_bonus": event_bonus,
-                    "shortage_bonus": shortage_bonus,
-                    "urgency_bonus": urgency_bonus,
-                    "total": score,
-                },
+                "score": round(score, 2),
+                "base_score": round(base_score, 2),
+                "event_boost": event_boost,
             }
         )
 
@@ -503,193 +353,214 @@ def build_decision(environment, resources):
         reverse=True,
     )
 
-    # ----------------------------------------------
-    # PRIMARY RECOMMENDATION
-    # ----------------------------------------------
+    # ------------------------------------------------------
+    # Energy allocation
+    # ------------------------------------------------------
+
+    allocations = allocate_energy(
+        environment,
+        resources,
+        energy,
+        event,
+    )
+
+    # ------------------------------------------------------
+    # Recommendations
+    # ------------------------------------------------------
+
+    actions = []
+
+    # ------------------------------------------------------
+    # Environmental alert
+    # ------------------------------------------------------
+
+    if event["event"] != "Normal":
+
+        actions.append(
+            {
+                "title": (
+                    f"⚠️ {event['event']} detected"
+                ),
+
+                "detail": (
+                    f"{event['reason']} "
+                    f"Detection confidence: "
+                    f"{event['confidence']}%."
+                ),
+
+                "type": "alert",
+            }
+        )
+
+        if event["signals"]:
+
+            actions.append(
+                {
+                    "title": "Environmental signals analyzed",
+
+                    "detail": (
+                        " • ".join(
+                            event["signals"]
+                        )
+                    ),
+
+                    "type": "detection",
+                }
+            )
+
+    # ------------------------------------------------------
+    # Event-specific actions
+    # ------------------------------------------------------
+
+    if event["event"] == "Storm":
+
+        actions.append(
+            {
+                "title": "Prioritize shelter operations",
+
+                "detail": (
+                    "Storm conditions increase the need "
+                    "for protected shelter, emergency "
+                    "supplies, water, food, and backup fuel."
+                ),
+
+                "type": "emergency",
+            }
+        )
+
+        actions.append(
+            {
+                "title": "Preserve emergency resources",
+
+                "detail": (
+                    "Reduce nonessential usage and reserve "
+                    "fuel, food, water, and medical supplies "
+                    "for critical operations."
+                ),
+
+                "type": "conservation",
+            }
+        )
+
+    elif event["event"] == "Heatwave":
+
+        actions.append(
+            {
+                "title": "Increase water priority",
+
+                "detail": (
+                    "High temperature and solar radiation "
+                    "increase water demand and cooling needs."
+                ),
+
+                "type": "emergency",
+            }
+        )
+
+        actions.append(
+            {
+                "title": "Protect cooling and shelter capacity",
+
+                "detail": (
+                    "Reserve energy for cooling centers, "
+                    "medical facilities, and vulnerable "
+                    "residents."
+                ),
+
+                "type": "energy",
+            }
+        )
+
+    elif event["event"] == "Heavy Rain":
+
+        actions.append(
+            {
+                "title": "Prepare shelters and drainage",
+
+                "detail": (
+                    "Heavy rainfall increases the risk "
+                    "of flooding and infrastructure disruption."
+                ),
+
+                "type": "emergency",
+            }
+        )
+
+    elif event["event"] == "High Wind":
+
+        actions.append(
+            {
+                "title": "Secure exposed infrastructure",
+
+                "detail": (
+                    "High winds increase the risk of "
+                    "damage to exposed equipment and buildings."
+                ),
+
+                "type": "emergency",
+            }
+        )
+
+    elif event["event"] == "Extreme Solar":
+
+        actions.append(
+            {
+                "title": "Use excess solar strategically",
+
+                "detail": (
+                    "Strong solar generation creates an "
+                    "opportunity to charge storage and "
+                    "operate flexible loads."
+                ),
+
+                "type": "energy",
+            }
+        )
+
+    # ------------------------------------------------------
+    # Top resource
+    # ------------------------------------------------------
 
     if ranked:
 
         top = ranked[0]
 
-        actions = [
+        actions.append(
             {
                 "title": (
                     f"Prioritize "
                     f"{top['name'].lower()} operations"
                 ),
+
                 "detail": (
-                    f"Priority {top['priority']}/10 leads "
-                    f"the current ranking, with "
-                    f"{top['quantity']} {top['unit']} available."
+                    f"Current decision score: "
+                    f"{top['score']}. "
+                    f"Base priority: "
+                    f"{top['priority']}/10. "
+                    f"{top['quantity']} "
+                    f"{top['unit']} available."
                 ),
+
                 "type": "priority",
             }
-        ]
-
-    else:
-
-        actions = [
-            {
-                "title": "No resources available",
-                "detail": (
-                    "The resource ledger is empty. "
-                    "Add resources to activate prioritization."
-                ),
-                "type": "priority",
-            }
-        ]
-
-    # ----------------------------------------------
-    # DISASTER RESPONSE
-    # ----------------------------------------------
-
-    if primary_event["event"] == "Storm":
-
-        actions.insert(
-            0,
-            {
-                "title": "🚨 Activate storm response",
-                "detail": (
-                    "High winds and rainfall indicate a storm. "
-                    "Protect shelter, emergency systems, and "
-                    "critical infrastructure before flexible loads."
-                ),
-                "type": "emergency",
-            },
         )
 
-    elif primary_event["event"] == "Heatwave":
-
-        actions.insert(
-            0,
-            {
-                "title": "🔥 Activate heatwave response",
-                "detail": (
-                    "Extreme heat and solar radiation detected. "
-                    "Increase water availability, cooling, and "
-                    "hydration support."
-                ),
-                "type": "emergency",
-            },
-        )
-
-    elif primary_event["event"] == "Heavy Rain":
-
-        actions.insert(
-            0,
-            {
-                "title": "🌧️ Prepare for heavy rainfall",
-                "detail": (
-                    "Rainfall is elevated. Capture available "
-                    "rainwater while protecting vulnerable supplies."
-                ),
-                "type": "warning",
-            },
-        )
-
-    elif primary_event["event"] == "High Wind":
-
-        actions.insert(
-            0,
-            {
-                "title": "🌬️ Protect infrastructure",
-                "detail": (
-                    "Strong winds detected. Secure exposed "
-                    "equipment and reduce non-essential loads."
-                ),
-                "type": "warning",
-            },
-        )
-
-    elif primary_event["event"] == "Extreme Solar":
-
-        actions.insert(
-            0,
-            {
-                "title": "☀️ Manage extreme solar exposure",
-                "detail": (
-                    "Solar radiation is unusually high. "
-                    "Use renewable generation while prioritizing "
-                    "cooling and water systems."
-                ),
-                "type": "warning",
-            },
-        )
-
-    # ----------------------------------------------
-    # COMPOUND CONDITION CALLOUTS
-    # ----------------------------------------------
-
-    for condition in resource_conditions:
-
-        actions.insert(
-            1 if primary_event["event"] != "Normal Conditions" else 0,
-            {
-                "title": (
-                    f"{condition['icon']} {condition['name']}"
-                    + (
-                        f" during {primary_event['event']}"
-                        if primary_event["event"] != "Normal Conditions"
-                        else ""
-                    )
-                ),
-                "detail": condition["detail"] + (
-                    " This is compounding with the active environmental "
-                    "event above — treat it as a combined emergency, "
-                    "not two separate issues."
-                    if primary_event["event"] != "Normal Conditions"
-                    else ""
-                ),
-                "type": "emergency" if condition["severity"] in ("Critical", "High") else "warning",
-            },
-        )
-
-    # ----------------------------------------------
-    # PREDICTIVE DEPLETION WARNINGS
-    # ----------------------------------------------
-
-    for item in ranked:
-
-        forecast = item["forecast"]
-
-        if forecast["hours_remaining"] is not None and forecast["hours_remaining"] < 72:
-
-            hours = forecast["hours_remaining"]
-
-            display_time = (
-                f"{hours:.0f} hours"
-                if hours < 48
-                else f"{hours / 24:.1f} days"
-            )
-
-            actions.append(
-                {
-                    "title": f"⏳ {item['name']} projected to run out in {display_time}",
-                    "detail": (
-                        f"At current consumption, {item['name'].lower()} "
-                        f"has roughly {display_time} of supply left "
-                        f"({forecast['urgency']} urgency). Increase "
-                        "production, rationing, or resupply now rather "
-                        "than after it's critical."
-                    ),
-                    "type": "forecast",
-                }
-            )
-
-    # ----------------------------------------------
-    # ENERGY RESPONSE
-    # ----------------------------------------------
+    # ------------------------------------------------------
+    # Energy recommendations
+    # ------------------------------------------------------
 
     if energy["solar_level"] == "High":
 
         actions.append(
             {
                 "title": "Run high-load tasks on solar",
+
                 "detail": (
                     "Strong sunlight makes desalination, "
-                    "charging, and pumping good uses of "
-                    "current renewable generation."
+                    "charging, and pumping good uses "
+                    "of current renewable generation."
                 ),
+
                 "type": "energy",
             }
         )
@@ -699,10 +570,12 @@ def build_decision(environment, resources):
         actions.append(
             {
                 "title": "Use wind generation first",
+
                 "detail": (
-                    "Wind is the strongest renewable source "
-                    "right now. Reserve fuel for critical backup."
+                    "Wind is currently a strong renewable "
+                    "source. Reserve fuel for critical backup."
                 ),
+
                 "type": "energy",
             }
         )
@@ -712,74 +585,82 @@ def build_decision(environment, resources):
         actions.append(
             {
                 "title": "Conserve and store energy",
+
                 "detail": (
-                    "Renewable output is moderate or low. "
-                    "Defer flexible loads and protect the "
-                    "battery reserve."
+                    "Renewable output is moderate or low, "
+                    "so defer flexible loads and protect "
+                    "the battery reserve."
                 ),
+
                 "type": "energy",
             }
         )
 
-    # ----------------------------------------------
-    # STORAGE
-    # ----------------------------------------------
+    # ------------------------------------------------------
+    # Storage
+    # ------------------------------------------------------
 
-    if primary_event["event"] in [
-        "Storm",
-        "High Wind",
-        "Heatwave",
-    ]:
+    actions.append(
+        {
+            "title": "Store remaining energy",
 
-        actions.append(
-            {
-                "title": "Increase emergency battery reserve",
-                "detail": (
-                    "Environmental risk is elevated. "
-                    "Reserve renewable energy for critical "
-                    "systems if conditions worsen."
-                ),
-                "type": "storage",
-            }
-        )
+            "detail": (
+                "Keep surplus energy in storage for "
+                "future low-production periods and "
+                "overnight demand."
+            ),
 
-    else:
+            "type": "storage",
+        }
+    )
 
-        actions.append(
-            {
-                "title": "Store remaining energy",
-                "detail": (
-                    "Keep surplus energy in storage for the "
-                    "next low-production period and overnight demand."
-                ),
-                "type": "storage",
-            }
-        )
-
-    energy_allocation = allocate_energy(environment, resources, energy)
+    # ------------------------------------------------------
+    # Final decision
+    # ------------------------------------------------------
 
     return {
         "environment": environment,
         "energy": energy,
+        "energy_allocation": allocations,
         "event": event,
         "resources": ranked,
         "recommendations": actions,
-        "energy_allocation": energy_allocation,
     }
 
 
-# --------------------------------------------------
+# ==========================================================
 # AUTOMATIC ENERGY ALLOCATION
-# --------------------------------------------------
+# ==========================================================
 
-def allocate_energy(environment, resources, energy):
-
+def allocate_energy(
+    environment,
+    resources,
+    energy,
+    event=None,
+):
     """
-    Automatically decides how available renewable energy
-    should be distributed across island operations.
+    Automatically determines how renewable energy
+    should be distributed across island systems.
+
+    Event detection changes the allocation strategy.
     """
 
     total_kw = energy["total_kw"]
+
+    # ------------------------------------------------------
+    # Base allocation
+    # ------------------------------------------------------
+
+    allocations = {
+        "💧 Water / Desalination": 30,
+        "🏥 Emergency Systems": 25,
+        "🏠 Essential Housing": 25,
+        "🔋 Battery Storage": 20,
+    }
+
+    # ------------------------------------------------------
+    # Water scarcity
+    # ------------------------------------------------------
 
     water = next(
         (
@@ -790,78 +671,165 @@ def allocate_energy(environment, resources, energy):
         None,
     )
 
-    allocations = {
-        "💧 Water / Desalination": 30,
-        "🏥 Emergency Systems": 25,
-        "🏠 Essential Housing": 25,
-        "🔋 Battery Storage": 20,
-    }
-
-    event = detect_environmental_event(environment)
-
-    # ----------------------------------------------
-    # WATER SHORTAGE
-    # ----------------------------------------------
-
     if water and water["quantity"] < 500:
 
-        allocations["💧 Water / Desalination"] += 20
-        allocations["🔋 Battery Storage"] -= 10
-        allocations["🏠 Essential Housing"] -= 10
+        allocations[
+            "💧 Water / Desalination"
+        ] += 20
 
-    # ----------------------------------------------
-    # HIGH TEMPERATURE
-    # ----------------------------------------------
+        allocations[
+            "🔋 Battery Storage"
+        ] -= 10
+
+        allocations[
+            "🏠 Essential Housing"
+        ] -= 10
+
+    # ------------------------------------------------------
+    # High temperature
+    # ------------------------------------------------------
 
     if environment["temperature"] >= 28:
 
-        allocations["🏠 Essential Housing"] += 10
-        allocations["🔋 Battery Storage"] -= 10
+        allocations[
+            "🏠 Essential Housing"
+        ] += 10
 
-    # ----------------------------------------------
-    # STORM
-    # ----------------------------------------------
+        allocations[
+            "🔋 Battery Storage"
+        ] -= 10
 
-    if event["event"] == "Storm":
-
-        allocations["🏥 Emergency Systems"] += 15
-        allocations["🏠 Essential Housing"] += 20
-        allocations["🔋 Battery Storage"] += 15
-        allocations["💧 Water / Desalination"] -= 10
-
-    # ----------------------------------------------
-    # HEATWAVE
-    # ----------------------------------------------
-
-    if event["event"] == "Heatwave":
-
-        allocations["💧 Water / Desalination"] += 20
-        allocations["🏠 Essential Housing"] += 10
-        allocations["🔋 Battery Storage"] -= 10
-
-    # ----------------------------------------------
-    # HIGH WIND
-    # ----------------------------------------------
-
-    if event["event"] == "High Wind":
-
-        allocations["🏠 Essential Housing"] += 10
-        allocations["🏥 Emergency Systems"] += 10
-        allocations["🔋 Battery Storage"] += 10
-
-    # ----------------------------------------------
-    # CLOUDY CONDITIONS
-    # ----------------------------------------------
+    # ------------------------------------------------------
+    # Cloudy conditions
+    # ------------------------------------------------------
 
     if environment["weather"] == "Cloudy":
 
-        allocations["🔋 Battery Storage"] += 10
-        allocations["🏠 Essential Housing"] -= 5
-        allocations["💧 Water / Desalination"] -= 5
+        allocations[
+            "🔋 Battery Storage"
+        ] += 10
 
-    # ----------------------------------------------
-    # PREVENT NEGATIVE VALUES
-    # ----------------------------------------------
+        allocations[
+            "🏠 Essential Housing"
+        ] -= 5
+
+        allocations[
+            "💧 Water / Desalination"
+        ] -= 5
+
+    # ------------------------------------------------------
+    # STORM RESPONSE
+    # ------------------------------------------------------
+
+    if event and event["event"] == "Storm":
+
+        allocations[
+            "🏥 Emergency Systems"
+        ] += 15
+
+        allocations[
+            "🏠 Essential Housing"
+        ] += 15
+
+        allocations[
+            "🔋 Battery Storage"
+        ] += 10
+
+        allocations[
+            "💧 Water / Desalination"
+        ] -= 20
+
+    # ------------------------------------------------------
+    # HEATWAVE RESPONSE
+    # ------------------------------------------------------
+
+    elif event and event["event"] == "Heatwave":
+
+        allocations[
+            "💧 Water / Desalination"
+        ] += 20
+
+        allocations[
+            "🏠 Essential Housing"
+        ] += 15
+
+        allocations[
+            "🔋 Battery Storage"
+        ] -= 20
+
+        allocations[
+            "🏥 Emergency Systems"
+        ] -= 15
+
+    # ------------------------------------------------------
+    # HIGH WIND RESPONSE
+    # ------------------------------------------------------
+
+    elif event and event["event"] == "High Wind":
+
+        allocations[
+            "🏥 Emergency Systems"
+        ] += 10
+
+        allocations[
+            "🏠 Essential Housing"
+        ] += 10
+
+        allocations[
+            "🔋 Battery Storage"
+        ] += 10
+
+        allocations[
+            "💧 Water / Desalination"
+        ] -= 10
+
+    # ------------------------------------------------------
+    # Heavy rain response
+    # ------------------------------------------------------
+
+    elif event and event["event"] == "Heavy Rain":
+
+        allocations[
+            "🏠 Essential Housing"
+        ] += 10
+
+        allocations[
+            "🏥 Emergency Systems"
+        ] += 10
+
+        allocations[
+            "🔋 Battery Storage"
+        ] += 10
+
+        allocations[
+            "💧 Water / Desalination"
+        ] -= 10
+
+    # ------------------------------------------------------
+    # Extreme solar response
+    # ------------------------------------------------------
+
+    elif event and event["event"] == "Extreme Solar":
+
+        allocations[
+            "💧 Water / Desalination"
+        ] += 10
+
+        allocations[
+            "🔋 Battery Storage"
+        ] += 10
+
+        allocations[
+            "🏠 Essential Housing"
+        ] -= 10
+
+        allocations[
+            "🏥 Emergency Systems"
+        ] -= 10
+
+    # ------------------------------------------------------
+    # Prevent negative allocations
+    # ------------------------------------------------------
 
     for system in allocations:
 
@@ -870,38 +838,38 @@ def allocate_energy(environment, resources, energy):
             allocations[system],
         )
 
-    # ----------------------------------------------
-    # NORMALIZE TO 100%
-    # ----------------------------------------------
+    # ------------------------------------------------------
+    # Normalize allocations to 100%
+    # ------------------------------------------------------
 
     total_percent = sum(
         allocations.values()
     )
 
-    if total_percent > 0:
-
-        allocations = {
-            system: round(
-                percent / total_percent * 100,
-                1,
-            )
-            for system, percent in allocations.items()
-        }
-
-    # ----------------------------------------------
-    # CALCULATE kW
-    # ----------------------------------------------
+    if total_percent <= 0:
+        total_percent = 1
 
     results = []
 
     for system, percent in allocations.items():
 
+        normalized_percent = (
+            percent
+            / total_percent
+            * 100
+        )
+
         results.append(
             {
                 "system": system,
-                "percent": percent,
+                "percent": round(
+                    normalized_percent,
+                    1,
+                ),
                 "kw": round(
-                    total_kw * percent / 100,
+                    total_kw
+                    * normalized_percent
+                    / 100,
                     2,
                 ),
             }

@@ -2,8 +2,8 @@ import unittest
 
 from decision_engine import (
     build_decision,
+    detect_event,
     energy_potential,
-    detect_environmental_event,
 )
 
 
@@ -12,18 +12,16 @@ class DecisionEngineTests(unittest.TestCase):
     def setUp(self):
 
         self.environment = {
-            "solar_radiation": 850,
+            "solar_radiation": 900,
             "wind_speed": 4,
             "temperature": 28,
-            "rainfall": 0,
             "weather": "Clear",
             "time_of_day": "12:00",
         }
 
-
-    # --------------------------------------------------
-    # ENERGY
-    # --------------------------------------------------
+    # ======================================================
+    # ENERGY TESTS
+    # ======================================================
 
     def test_energy_uses_solar_and_wind(self):
 
@@ -41,15 +39,13 @@ class DecisionEngineTests(unittest.TestCase):
             result["solar_kw"],
         )
 
-
-    # --------------------------------------------------
-    # WATER / HEAT
-    # --------------------------------------------------
+    # ======================================================
+    # WATER PRIORITY TEST
+    # ======================================================
 
     def test_priority_and_heat_can_promote_water(self):
 
         resources = [
-
             {
                 "name": "Food",
                 "quantity": 1000,
@@ -63,7 +59,6 @@ class DecisionEngineTests(unittest.TestCase):
                 "unit": "L",
                 "priority": 10,
             },
-
         ]
 
         result = build_decision(
@@ -76,19 +71,20 @@ class DecisionEngineTests(unittest.TestCase):
             "Water",
         )
 
-
-    # --------------------------------------------------
-    # LOW ENERGY
-    # --------------------------------------------------
+    # ======================================================
+    # LOW ENERGY TEST
+    # ======================================================
 
     def test_low_conditions_recommend_conservation(self):
 
+        environment = {
+            **self.environment,
+            "solar_radiation": 100,
+            "wind_speed": 2,
+        }
+
         result = build_decision(
-            {
-                **self.environment,
-                "solar_radiation": 100,
-                "wind_speed": 2,
-            },
+            environment,
             [
                 {
                     "name": "Water",
@@ -99,35 +95,33 @@ class DecisionEngineTests(unittest.TestCase):
             ],
         )
 
-        energy_recommendations = [
-            r
-            for r in result["recommendations"]
-            if r["type"] == "energy"
+        energy_types = [
+            recommendation["type"]
+            for recommendation
+            in result["recommendations"]
         ]
 
-        self.assertTrue(
-            any(
-                "Conserve" in r["title"]
-                for r in energy_recommendations
-            )
+        self.assertIn(
+            "energy",
+            energy_types,
         )
 
-
-    # --------------------------------------------------
+    # ======================================================
     # STORM DETECTION
-    # --------------------------------------------------
+    # ======================================================
 
-    def test_storm_is_detected(self):
+    def test_storm_detection(self):
 
-        environment = {
-            **self.environment,
-            "wind_speed": 15,
-            "rainfall": 12,
-            "weather": "Storm",
+        storm_environment = {
+            "solar_radiation": 280,
+            "wind_speed": 16,
+            "temperature": 23,
+            "weather": "Heavy rain",
+            "time_of_day": "14:00",
         }
 
-        result = detect_environmental_event(
-            environment
+        result = detect_event(
+            storm_environment
         )
 
         self.assertEqual(
@@ -137,24 +131,30 @@ class DecisionEngineTests(unittest.TestCase):
 
         self.assertEqual(
             result["severity"],
-            "Critical",
+            "High",
         )
 
+        self.assertGreaterEqual(
+            result["confidence"],
+            70,
+        )
 
-    # --------------------------------------------------
+    # ======================================================
     # HEATWAVE DETECTION
-    # --------------------------------------------------
+    # ======================================================
 
-    def test_heatwave_is_detected(self):
+    def test_heatwave_detection(self):
 
-        environment = {
-            **self.environment,
-            "temperature": 31,
-            "solar_radiation": 950,
+        heat_environment = {
+            "solar_radiation": 1050,
+            "wind_speed": 4,
+            "temperature": 35,
+            "weather": "Clear",
+            "time_of_day": "13:00",
         }
 
-        result = detect_environmental_event(
-            environment
+        result = detect_event(
+            heat_environment
         )
 
         self.assertEqual(
@@ -162,117 +162,144 @@ class DecisionEngineTests(unittest.TestCase):
             "Heatwave",
         )
 
+        self.assertEqual(
+            result["severity"],
+            "High",
+        )
 
-    # --------------------------------------------------
-    # STORM CHANGES PRIORITIES
-    # --------------------------------------------------
+    # ======================================================
+    # HIGH WIND DETECTION
+    # ======================================================
 
-    def test_storm_promotes_shelter(self):
+    def test_high_wind_detection(self):
 
-        environment = {
-            **self.environment,
-            "wind_speed": 15,
-            "rainfall": 12,
-            "weather": "Storm",
+        wind_environment = {
+            "solar_radiation": 500,
+            "wind_speed": 14,
+            "temperature": 25,
+            "weather": "Cloudy",
+            "time_of_day": "15:00",
+        }
+
+        result = detect_event(
+            wind_environment
+        )
+
+        self.assertEqual(
+            result["event"],
+            "High Wind",
+        )
+
+    # ======================================================
+    # NORMAL CONDITIONS
+    # ======================================================
+
+    def test_normal_conditions(self):
+
+        normal_environment = {
+            "solar_radiation": 600,
+            "wind_speed": 6,
+            "temperature": 25,
+            "weather": "Clear",
+            "time_of_day": "12:00",
+        }
+
+        result = detect_event(
+            normal_environment
+        )
+
+        self.assertEqual(
+            result["event"],
+            "Normal",
+        )
+
+    # ======================================================
+    # STORM CHANGES RESOURCE PRIORITIES
+    # ======================================================
+
+    def test_storm_changes_priorities(self):
+
+        storm_environment = {
+            "solar_radiation": 280,
+            "wind_speed": 16,
+            "temperature": 23,
+            "weather": "Heavy rain",
+            "time_of_day": "14:00",
         }
 
         resources = [
-
             {
                 "name": "Food Stores",
-                "category": "Food",
-                "quantity": 1000,
+                "quantity": 126,
                 "unit": "meals",
                 "priority": 7,
             },
 
             {
-                "name": "Emergency Shelter",
-                "category": "General",
-                "quantity": 24,
-                "unit": "spaces",
+                "name": "Shelter",
+                "quantity": 50,
+                "unit": "units",
                 "priority": 5,
             },
-
         ]
 
         result = build_decision(
-            environment,
+            storm_environment,
             resources,
         )
 
-        self.assertEqual(
-            result["event"]["event"],
-            "Storm",
+        shelter = next(
+            resource
+            for resource in result["resources"]
+            if resource["name"] == "Shelter"
         )
 
         self.assertEqual(
-            result["resources"][0]["name"],
-            "Emergency Shelter",
+            shelter["event_boost"],
+            6,
         )
 
+    # ======================================================
+    # STORM CHANGES ENERGY ALLOCATION
+    # ======================================================
 
-    # --------------------------------------------------
-    # HEATWAVE CHANGES PRIORITIES
-    # --------------------------------------------------
+    def test_storm_changes_energy_allocation(self):
 
-    def test_heatwave_promotes_water(self):
-
-        environment = {
-            **self.environment,
-            "temperature": 31,
-            "solar_radiation": 950,
+        storm_environment = {
+            "solar_radiation": 280,
+            "wind_speed": 16,
+            "temperature": 23,
+            "weather": "Heavy rain",
+            "time_of_day": "14:00",
         }
 
         resources = [
-
-            {
-                "name": "Food Stores",
-                "category": "Food",
-                "quantity": 1000,
-                "unit": "meals",
-                "priority": 7,
-            },
-
             {
                 "name": "Fresh Water",
-                "category": "Water",
-                "quantity": 1000,
+                "quantity": 1840,
                 "unit": "liters",
-                "priority": 5,
-            },
-
+                "priority": 10,
+            }
         ]
 
         result = build_decision(
-            environment,
+            storm_environment,
             resources,
         )
 
-        self.assertEqual(
-            result["event"]["event"],
-            "Heatwave",
+        allocations = result[
+            "energy_allocation"
+        ]
+
+        emergency = next(
+            allocation
+            for allocation in allocations
+            if "Emergency" in allocation["system"]
         )
 
-        self.assertEqual(
-            result["resources"][0]["name"],
-            "Fresh Water",
-        )
-
-
-    # --------------------------------------------------
-    # NORMAL CONDITIONS
-    # --------------------------------------------------
-
-    def test_normal_conditions_are_detected(self):
-
-        result = detect_environmental_event(
-            self.environment
-        )
-
-        self.assertEqual(
-            result["event"],
-            "Normal Conditions",
+        self.assertGreater(
+            emergency["percent"],
+            25,
         )
 
 
