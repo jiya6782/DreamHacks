@@ -36,7 +36,6 @@ simulator = get_simulator()
 def get_resource_manager():
     return ResourceManager()
 
-
 resource_manager = get_resource_manager()
 
 

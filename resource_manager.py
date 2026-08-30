@@ -1,129 +1,333 @@
-"""Backend logic for managing island resources."""
+"""Resource management logic and Streamlit Resource Ledger UI."""
 
-from typing import Any, Dict, List
 import uuid
+import streamlit as st
 
 
 class ResourceManager:
     def __init__(self):
-        self.resources: List[Dict[str, Any]] = [
-            {
-                "id": "water",
-                "name": "Fresh water",
-                "category": "Water",
-                "quantity": 1840,
-                "unit": "liters",
-                "horizon": "4.0 days",
-                "priority": 10,
-            },
-            {
-                "id": "food",
-                "name": "Food stores",
-                "category": "Food",
-                "quantity": 126,
-                "unit": "meals",
-                "horizon": "8.0 days",
-                "priority": 7,
-            },
-            {
-                "id": "fuel",
-                "name": "Diesel fuel",
-                "category": "Fuel",
-                "quantity": 420,
-                "unit": "liters",
-                "horizon": "14.0 days",
-                "priority": 6,
-            },
-            {
-                "id": "general",
-                "name": "General supplies",
-                "category": "General",
-                "quantity": 86,
-                "unit": "units",
-                "horizon": "21.0 days",
-                "priority": 5,
-            },
-        ]
+        if "resources" not in st.session_state:
+            st.session_state.resources = [
+                {
+                    "id": "water",
+                    "name": "Fresh Water",
+                    "category": "Water",
+                    "quantity": 1840.0,
+                    "unit": "liters",
+                    "horizon": "4.0 days",
+                    "priority": 10,
+                },
+                {
+                    "id": "food",
+                    "name": "Food Stores",
+                    "category": "Food",
+                    "quantity": 126.0,
+                    "unit": "meals",
+                    "horizon": "8.0 days",
+                    "priority": 7,
+                },
+                {
+                    "id": "fuel",
+                    "name": "Diesel Fuel",
+                    "category": "Fuel",
+                    "quantity": 420.0,
+                    "unit": "liters",
+                    "horizon": "14.0 days",
+                    "priority": 6,
+                },
+                {
+                    "id": "supplies",
+                    "name": "General Supplies",
+                    "category": "General",
+                    "quantity": 86.0,
+                    "unit": "units",
+                    "horizon": "21.0 days",
+                    "priority": 5,
+                },
+            ]
 
-    def get_all_resources(self) -> List[Dict[str, Any]]:
-        """Return all resources."""
-        return self.resources
+    # -----------------------------
+    # BACKEND: Get resources
+    # -----------------------------
 
-    def get_resource(self, resource_id: str) -> Dict[str, Any] | None:
-        """Find one resource by its ID."""
-        for resource in self.resources:
-            if resource["id"] == resource_id:
-                return resource
-        return None
+    def get_all_resources(self):
+        return st.session_state.resources
+
+    # -----------------------------
+    # BACKEND: Add resource
+    # -----------------------------
 
     def add_resource(
         self,
-        name: str,
-        category: str,
-        quantity: float,
-        unit: str,
-        horizon: str,
-        priority: int,
-    ) -> Dict[str, Any]:
-        """Create and add a new resource."""
-
-        resource = {
+        name,
+        category,
+        quantity,
+        unit,
+        horizon,
+        priority,
+    ):
+        new_resource = {
             "id": str(uuid.uuid4()),
             "name": name,
             "category": category,
-            "quantity": quantity,
+            "quantity": max(float(quantity), 0),
             "unit": unit,
             "horizon": horizon,
-            "priority": priority,
+            "priority": max(1, min(int(priority), 10)),
         }
 
-        self.resources.append(resource)
-        return resource
+        st.session_state.resources.append(new_resource)
+        return new_resource
+
+    # -----------------------------
+    # BACKEND: Update resource
+    # -----------------------------
 
     def update_resource(
         self,
-        resource_id: str,
-        name: str | None = None,
-        category: str | None = None,
-        quantity: float | None = None,
-        unit: str | None = None,
-        horizon: str | None = None,
-        priority: int | None = None,
-    ) -> Dict[str, Any] | None:
-        """Update an existing resource."""
+        resource_id,
+        name,
+        category,
+        quantity,
+        unit,
+        horizon,
+        priority,
+    ):
+        for index, resource in enumerate(st.session_state.resources):
+            if resource["id"] == resource_id:
 
-        resource = self.get_resource(resource_id)
+                st.session_state.resources[index] = {
+                    "id": resource_id,
+                    "name": name,
+                    "category": category,
+                    "quantity": max(float(quantity), 0),
+                    "unit": unit,
+                    "horizon": horizon,
+                    "priority": max(1, min(int(priority), 10)),
+                }
 
-        if resource is None:
-            return None
+                return True
 
-        if name is not None:
-            resource["name"] = name
+        return False
 
-        if category is not None:
-            resource["category"] = category
+    # -----------------------------
+    # BACKEND: Delete resource
+    # -----------------------------
 
-        if quantity is not None:
-            resource["quantity"] = max(quantity, 0)
+    def delete_resource(self, resource_id):
+        for resource in st.session_state.resources:
+            if resource["id"] == resource_id:
+                st.session_state.resources.remove(resource)
+                return True
 
-        if unit is not None:
-            resource["unit"] = unit
+        return False
 
-        if horizon is not None:
-            resource["horizon"] = horizon
+    # -----------------------------
+    # FRONTEND: Add Resource Dialog
+    # -----------------------------
 
-        if priority is not None:
-            resource["priority"] = max(1, min(priority, 10))
+    def show_add_dialog(self):
 
-        return resource
+        @st.dialog("Add Resource")
+        def add_dialog():
 
-    def delete_resource(self, resource_id: str) -> bool:
-        """Delete a resource by its ID."""
+            with st.form("add_resource_form"):
+                name = st.text_input("Resource Name")
 
-        resource = self.get_resource(resource_id)
+                category = st.selectbox(
+                    "Category",
+                    ["Water", "Food", "Fuel", "Energy", "Medical", "Other"],
+                )
 
-        if resource is None:
-            return False
+                quantity = st.number_input(
+                    "Quantity",
+                    min_value=0.0,
+                    value=0.0,
+                )
 
-        self.resources.remove(resource)
-        return True
+                unit = st.text_input("Unit")
+
+                horizon = st.text_input(
+                    "Estimated Horizon",
+                    placeholder="Example: 7 days",
+                )
+
+                priority = st.slider(
+                    "Priority",
+                    min_value=1,
+                    max_value=10,
+                    value=5,
+                )
+
+                submitted = st.form_submit_button("Add Resource")
+
+                if submitted:
+                    if name.strip() and unit.strip():
+
+                        self.add_resource(
+                            name=name,
+                            category=category,
+                            quantity=quantity,
+                            unit=unit,
+                            horizon=horizon,
+                            priority=priority,
+                        )
+
+                        st.rerun()
+
+                    else:
+                        st.error(
+                            "Please enter a resource name and unit."
+                        )
+
+        add_dialog()
+
+    # -----------------------------
+    # FRONTEND: Edit Resource Dialog
+    # -----------------------------
+
+    def show_edit_dialog(self, resource):
+
+        @st.dialog("Edit Resource")
+        def edit_dialog():
+
+            with st.form(f"edit_form_{resource['id']}"):
+
+                name = st.text_input(
+                    "Resource Name",
+                    value=resource["name"],
+                )
+
+                category_options = [
+                    "Water",
+                    "Food",
+                    "Fuel",
+                    "Energy",
+                    "Medical",
+                    "Other",
+                ]
+
+                current_category = resource.get(
+                    "category",
+                    "Other",
+                )
+
+                category_index = (
+                    category_options.index(current_category)
+                    if current_category in category_options
+                    else len(category_options) - 1
+                )
+
+                category = st.selectbox(
+                    "Category",
+                    category_options,
+                    index=category_index,
+                )
+
+                quantity = st.number_input(
+                    "Quantity",
+                    min_value=0.0,
+                    value=float(resource["quantity"]),
+                )
+
+                unit = st.text_input(
+                    "Unit",
+                    value=resource["unit"],
+                )
+
+                horizon = st.text_input(
+                    "Estimated Horizon",
+                    value=resource.get("horizon", ""),
+                )
+
+                priority = st.slider(
+                    "Priority",
+                    min_value=1,
+                    max_value=10,
+                    value=int(resource["priority"]),
+                )
+
+                submitted = st.form_submit_button(
+                    "Save Changes"
+                )
+
+                if submitted:
+
+                    self.update_resource(
+                        resource_id=resource["id"],
+                        name=name,
+                        category=category,
+                        quantity=quantity,
+                        unit=unit,
+                        horizon=horizon,
+                        priority=priority,
+                    )
+
+                    st.rerun()
+
+        edit_dialog()
+
+    # -----------------------------
+    # FRONTEND: Resource Ledger
+    # -----------------------------
+
+    def show_resource_ledger(self):
+
+        st.subheader("📦 Resource Ledger")
+
+        st.caption(
+            "Manage island resources and set priorities "
+            "for the decision engine."
+        )
+
+        if st.button("＋ Add Resource"):
+            self.show_add_dialog()
+
+        # Table headers
+        headers = st.columns([2.2, 1.3, 1.4, 1.3, 1, 0.5, 0.5])
+
+        headers[0].markdown("**RESOURCE**")
+        headers[1].markdown("**CATEGORY**")
+        headers[2].markdown("**ON HAND**")
+        headers[3].markdown("**HORIZON**")
+        headers[4].markdown("**PRIORITY**")
+
+        # Resource rows
+        for resource in self.get_all_resources():
+
+            cols = st.columns(
+                [2.2, 1.3, 1.4, 1.3, 1, 0.5, 0.5]
+            )
+
+            with cols[0]:
+                st.write(f"**{resource['name']}**")
+
+            with cols[1]:
+                st.write(resource.get("category", "Other"))
+
+            with cols[2]:
+                st.write(
+                    f"{resource['quantity']} "
+                    f"{resource['unit']}"
+                )
+
+            with cols[3]:
+                st.write(resource.get("horizon", "—"))
+
+            with cols[4]:
+                st.write(f"P{resource['priority']}/10")
+
+            with cols[5]:
+                if st.button(
+                    "✏️",
+                    key=f"edit_{resource['id']}",
+                ):
+                    self.show_edit_dialog(resource)
+
+            with cols[6]:
+                if st.button(
+                    "🗑️",
+                    key=f"delete_{resource['id']}",
+                ):
+                    self.delete_resource(resource["id"])
+                    st.rerun()
