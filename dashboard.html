@@ -1,42 +1,41 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Island Resource Station</title>
-
-<!-- Fonts -->
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-
-<!-- Tailwind (Play CDN — JIT, no build step, arbitrary values work out of the box) -->
-<script src="https://cdn.tailwindcss.com"></script>
-
-<!-- Base tokens / focus states not covered by utility classes -->
-<link rel="stylesheet" href="./styles.css" />
-
-<!-- React + ReactDOM + Babel, all from CDN -->
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@18.3.1",
-    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client"
-  }
-}
-</script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Isla / Resource Command</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+    :root { --ink:#173b3f; --muted:#668084; --paper:#f4f1e8; --line:#cbd8cf; --mint:#b8e0cf; --coral:#dc6d57; --white:#fffdf6; }
+    * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:var(--paper); font-family:'Space Grotesk',sans-serif; }
+    .shell { max-width:1200px; margin:auto; padding:34px 28px 60px; } header { display:flex; justify-content:space-between; align-items:end; border-bottom:2px solid var(--ink); padding-bottom:22px; }
+    .eyebrow,.label,.mono { font-family:'DM Mono',monospace; letter-spacing:.08em; text-transform:uppercase; font-size:11px; } h1 { font-size:clamp(32px,5vw,64px); line-height:.95; max-width:600px; margin:14px 0 0; letter-spacing:-.04em; } h2 { margin:0 0 22px; font-size:20px; }
+    button { border:0; background:var(--ink); color:var(--white); padding:13px 18px; font:600 13px 'Space Grotesk'; cursor:pointer; } button:hover { background:var(--coral); } .updated { color:var(--muted); font-size:12px; text-align:right; margin-top:10px; }
+    .conditions { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); margin:28px 0; border:1px solid var(--line); } .metric { background:var(--white); padding:20px; min-height:130px; } .metric strong { display:block; font-size:34px; margin-top:20px; } .unit { color:var(--muted); font-size:13px; }
+    .grid { display:grid; grid-template-columns:1.15fr .85fr; gap:28px; } section { background:var(--white); border:1px solid var(--line); padding:24px; } .energy { background:var(--mint); border-color:var(--mint); } .energy-row { display:flex; justify-content:space-between; align-items:end; border-bottom:1px solid rgba(23,59,63,.2); padding:13px 0; } .energy-row strong { font-size:30px; } .energy-total { margin-top:20px; font-size:14px; } .energy-total b { font-size:42px; }
+    .resource { display:grid; grid-template-columns:1fr auto; gap:4px 20px; padding:14px 0; border-bottom:1px solid var(--line); } .resource:last-child { border-bottom:0; } .resource-name { font-weight:600; } .bar { grid-column:1 / -1; height:5px; background:#e1e8df; margin-top:5px; } .bar i { display:block; height:100%; background:var(--coral); } .score { color:var(--coral); font-weight:700; }
+    .editor { margin-top:24px; } .edit-row { display:grid; grid-template-columns:1fr 80px 70px 75px; gap:8px; margin:8px 0; } input { width:100%; border:1px solid var(--line); background:var(--paper); color:var(--ink); padding:9px; font:13px 'DM Mono'; } .editor button { margin-top:10px; }
+    .recommendations { margin-top:28px; } .recommendation { display:grid; grid-template-columns:40px 1fr; gap:14px; padding:17px 0; border-top:1px solid var(--line); } .number { font:500 20px 'DM Mono'; color:var(--coral); } .recommendation strong { display:block; margin-bottom:5px; } .recommendation p { color:var(--muted); margin:0; font-size:14px; line-height:1.45; }
+    footer { margin-top:28px; color:var(--muted); font-size:12px; display:flex; justify-content:space-between; } @media (max-width:760px) { .shell { padding:22px 16px 40px; } header { align-items:start; gap:18px; flex-direction:column; } .conditions,.grid { grid-template-columns:1fr 1fr; gap:1px; } .grid { gap:16px; background:none; } .grid section { padding:18px; } .metric strong { font-size:26px; } } @media (max-width:480px) { .conditions,.grid { grid-template-columns:1fr; } .edit-row { grid-template-columns:1fr 70px; } }
+  </style>
 </head>
-<body>
-<div id="root"></div>
-
-<!-- App.jsx is transpiled in-browser by Babel and loaded as an ES module here,
-     so its `import React from "react"` line resolves via the import map above. -->
-<script type="text/babel" data-type="module">
-  import React from "react";
-  import { createRoot } from "react-dom/client";
-  import App from "./App.jsx";
-
-  createRoot(document.getElementById("root")).render(<App />);
-</script>
-</body>
-</html>
+<body><main class="shell">
+  <header><div><div class="eyebrow">Isla / command center</div><h1>Resource decisions for a changing island.</h1></div><div><button id="refresh">Refresh conditions</button><div class="updated" id="updated">Simulation standing by</div></div></header>
+  <div class="conditions" id="conditions"></div>
+  <div class="grid"><section class="energy"><h2>Renewable energy potential</h2><div id="energy"></div></section><section><h2>Available resources</h2><div id="resources"></div><div class="editor"><div class="label">Edit supplies / name, quantity, unit, priority</div><div id="inputs"></div><button id="save">Update decisions</button></div></section></div>
+  <section class="recommendations"><h2>Recommended next actions</h2><div id="recommendations"></div></section>
+  <footer><span>SIMULATION MODE / SENSOR READY</span><span>Decision model v1.0</span></footer>
+</main><script>
+const $ = id => document.getElementById(id); let current = [];
+function render(data) {
+  current = data.resources; const e = data.environment, energy = data.energy;
+  $('conditions').innerHTML = [['Sunlight', e.solar_radiation, 'W/m2'], ['Wind speed', e.wind_speed, 'm/s'], ['Temperature', e.temperature, 'C'], ['Weather', e.weather, e.time_of_day]].map(x => `<div class="metric"><span class="label">${x[0]}</span><strong>${x[1]}</strong><span class="unit">${x[2]}</span></div>`).join('');
+  $('energy').innerHTML = `<div class="energy-row"><span>Solar array <b class="mono">${energy.solar_level}</b></span><strong>${energy.solar_kw} <small>kW</small></strong></div><div class="energy-row"><span>Wind turbine <b class="mono">${energy.wind_level}</b></span><strong>${energy.wind_kw} <small>kW</small></strong></div><div class="energy-total"><b>${energy.total_kw}</b> kW estimated available now</div>`;
+  $('resources').innerHTML = current.map(r => `<div class="resource"><span class="resource-name">${r.name}</span><span class="score">${r.priority}/10</span><span class="unit">${r.quantity} ${r.unit}</span><span class="mono">score ${r.score}</span><div class="bar"><i style="width:${r.priority * 10}%"></i></div></div>`).join('');
+  $('inputs').innerHTML = current.map((r, i) => `<div class="edit-row"><input data-i="${i}" data-key="name" value="${r.name}"><input data-i="${i}" data-key="quantity" type="number" min="0" value="${r.quantity}"><input data-i="${i}" data-key="unit" value="${r.unit}"><input data-i="${i}" data-key="priority" type="number" min="1" max="10" value="${r.priority}"></div>`).join('');
+  $('recommendations').innerHTML = data.recommendations.map((r, i) => `<div class="recommendation"><div class="number">0${i + 1}</div><div><strong>${r.title}</strong><p>${r.detail}</p></div></div>`).join(''); $('updated').textContent = `Last reading ${e.timestamp.replace('T', ' / ')} / refresh advances 1 hour`;
+}
+async function load(path='/api/status', options) { render(await (await fetch(path, options)).json()); }
+$('refresh').onclick = () => load('/api/refresh', {method:'POST'});
+$('save').onclick = async () => { const updated = current.map((r, i) => { const copy = {...r}; document.querySelectorAll(`[data-i="${i}"]`).forEach(input => copy[input.dataset.key] = input.type === 'number' ? Number(input.value) : input.value); return copy; }); load('/api/resources', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(updated)}); };
+load();
+</script></body></html>
