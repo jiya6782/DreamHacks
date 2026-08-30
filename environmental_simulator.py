@@ -8,96 +8,108 @@ class EnvironmentalSimulator:
 
     def __init__(self, start=None):
 
-        self.current = (
-            start
-            or datetime(2025, 6, 21, 9, 0)
+        self.current = start or datetime(
+            2025,
+            6,
+            21,
+            9,
+            0,
         )
 
         self.step = 0
 
-    # ======================================================
-    # ENVIRONMENTAL SNAPSHOT
-    # ======================================================
-
     def snapshot(self) -> Dict[str, Any]:
 
-        scenario = self.step % 12
+        hour = (
+            self.current.hour
+            + self.current.minute / 60
+        )
 
         # --------------------------------------------------
-        # STORM
+        # DAYLIGHT
         # --------------------------------------------------
 
-        if scenario in [3, 4]:
-
-            solar = 280
-            wind = 16
-            temperature = 23
-            weather = "Heavy rain"
+        daylight = max(
+            0,
+            1 - abs(hour - 12) / 7,
+        )
 
         # --------------------------------------------------
-        # HEATWAVE
+        # CLOUD CYCLE
         # --------------------------------------------------
 
-        elif scenario in [7, 8]:
-
-            solar = 1050
-            wind = 4
-            temperature = 35
-            weather = "Clear"
+        cloud_cycle = (
+            self.step % 5
+        ) / 4
 
         # --------------------------------------------------
-        # HIGH WIND
+        # SOLAR
         # --------------------------------------------------
 
-        elif scenario == 10:
-
-            solar = 500
-            wind = 14
-            temperature = 25
-            weather = "Cloudy"
+        solar = round(
+            max(
+                0,
+                930
+                * daylight
+                * (
+                    1
+                    - 0.28 * cloud_cycle
+                ),
+            )
+        )
 
         # --------------------------------------------------
-        # NORMAL CONDITIONS
+        # WIND
         # --------------------------------------------------
+
+        wind = round(
+            9
+            + 4 * ((self.step + 1) % 3)
+            - 2 * cloud_cycle,
+            1,
+        )
+
+        # --------------------------------------------------
+        # TEMPERATURE
+        # --------------------------------------------------
+
+        temperature = round(
+            22
+            + 7 * daylight
+            - cloud_cycle * 2,
+            1,
+        )
+
+        # --------------------------------------------------
+        # RAINFALL
+        # --------------------------------------------------
+        #
+        # Every few simulation steps the island enters
+        # a rainfall period. This gives the decision engine
+        # another sensor to analyze.
+        #
+        # Steps 6-7 create a storm-like period.
+        # --------------------------------------------------
+
+        storm_cycle = self.step % 10
+
+        if storm_cycle in [6, 7]:
+
+            rainfall = round(
+                8 + storm_cycle * 0.8,
+                1,
+            )
+
+            weather = "Storm"
+
+        elif storm_cycle == 8:
+
+            rainfall = 5.0
+            weather = "Rain"
 
         else:
 
-            hour = (
-                self.current.hour
-                + self.current.minute / 60
-            )
-
-            daylight = max(
-                0,
-                1 - abs(hour - 12) / 7,
-            )
-
-            cloud_cycle = (
-                self.step % 5
-            ) / 4
-
-            solar = round(
-                max(
-                    0,
-                    930
-                    * daylight
-                    * (1 - 0.28 * cloud_cycle),
-                )
-            )
-
-            wind = round(
-                9
-                + 4 * ((self.step + 1) % 3)
-                - 2 * cloud_cycle,
-                1,
-            )
-
-            temperature = round(
-                22
-                + 7 * daylight
-                - cloud_cycle * 2,
-                1,
-            )
+            rainfall = 0.0
 
             weather = (
                 "Clear"
@@ -106,6 +118,32 @@ class EnvironmentalSimulator:
                 if cloud_cycle < 0.8
                 else "Cloudy"
             )
+
+        # --------------------------------------------------
+        # HEATWAVE SIMULATION
+        # --------------------------------------------------
+        #
+        # Steps 2-4 represent an unusually hot period.
+        # This is still detected by environmental conditions
+        # in decision_engine.py rather than directly by
+        # the simulator.
+        # --------------------------------------------------
+
+        if self.step in [2, 3, 4]:
+
+            temperature = round(
+                temperature + 3,
+                1,
+            )
+
+            solar = max(
+                solar,
+                850,
+            )
+
+        # --------------------------------------------------
+        # RETURN SENSOR DATA
+        # --------------------------------------------------
 
         return {
             "timestamp": self.current.isoformat(
@@ -122,12 +160,10 @@ class EnvironmentalSimulator:
 
             "temperature": temperature,
 
+            "rainfall": rainfall,
+
             "weather": weather,
         }
-
-    # ======================================================
-    # ADVANCE SIMULATION
-    # ======================================================
 
     def advance(self) -> None:
 
