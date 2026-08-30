@@ -270,64 +270,92 @@ class ResourceManager:
     # -----------------------------
     # FRONTEND: Resource Ledger
     # -----------------------------
-
     def show_resource_ledger(self):
 
-        st.subheader("📦 Resource Ledger")
+    st.subheader("RESOURCE LEDGER")
 
-        st.caption(
-            "Manage island resources and set priorities "
-            "for the decision engine."
+    st.caption(
+        "Manage island supplies and set priority levels for the "
+        "decision engine."
+    )
+
+    # Add resource button
+    if st.button("＋ Add Resource"):
+        self.show_add_dialog()
+
+    st.divider()
+
+    # Table header
+    header = st.columns([2.4, 1.3, 1.5, 1.3, 1, 0.5, 0.5])
+
+    with header[0]:
+        st.markdown("**RESOURCE LINE**")
+
+    with header[1]:
+        st.markdown("**CATEGORY**")
+
+    with header[2]:
+        st.markdown("**ON HAND**")
+
+    with header[3]:
+        st.markdown("**HORIZON**")
+
+    with header[4]:
+        st.markdown("**PRIORITY**")
+
+    st.divider()
+
+    # Table rows
+    for resource in self.get_all_resources():
+
+        cols = st.columns(
+            [2.4, 1.3, 1.5, 1.3, 1, 0.5, 0.5]
         )
 
-        if st.button("＋ Add Resource"):
-            self.show_add_dialog()
+        # Resource name + ID
+        with cols[0]:
+            st.markdown(f"**{resource['name']}**")
+            st.caption(f"ID: {resource['id'][:8]}")
 
-        # Table headers
-        headers = st.columns([2.2, 1.3, 1.4, 1.3, 1, 0.5, 0.5])
+        # Category
+        with cols[1]:
+            st.write(resource.get("category", "Other"))
 
-        headers[0].markdown("**RESOURCE**")
-        headers[1].markdown("**CATEGORY**")
-        headers[2].markdown("**ON HAND**")
-        headers[3].markdown("**HORIZON**")
-        headers[4].markdown("**PRIORITY**")
-
-        # Resource rows
-        for resource in self.get_all_resources():
-
-            cols = st.columns(
-                [2.2, 1.3, 1.4, 1.3, 1, 0.5, 0.5]
+        # Quantity
+        with cols[2]:
+            st.markdown(
+                f"**{resource['quantity']}** "
+                f"{resource['unit']}"
             )
 
-            with cols[0]:
-                st.write(f"**{resource['name']}**")
+        # Horizon
+        with cols[3]:
+            st.write(resource.get("horizon", "—"))
 
-            with cols[1]:
-                st.write(resource.get("category", "Other"))
+        # Priority
+        with cols[4]:
+            st.markdown(
+                f"**P{resource['priority']}** / 10"
+            )
 
-            with cols[2]:
-                st.write(
-                    f"{resource['quantity']} "
-                    f"{resource['unit']}"
-                )
+        # Edit
+        with cols[5]:
+            if st.button(
+                "✏️",
+                key=f"edit_{resource['id']}",
+                help="Edit resource",
+            ):
+                self.show_edit_dialog(resource)
 
-            with cols[3]:
-                st.write(resource.get("horizon", "—"))
+        # Delete
+        with cols[6]:
+            if st.button(
+                "🗑️",
+                key=f"delete_{resource['id']}",
+                help="Delete resource",
+            ):
+                self.delete_resource(resource["id"])
+                st.rerun()
 
-            with cols[4]:
-                st.write(f"P{resource['priority']}/10")
-
-            with cols[5]:
-                if st.button(
-                    "✏️",
-                    key=f"edit_{resource['id']}",
-                ):
-                    self.show_edit_dialog(resource)
-
-            with cols[6]:
-                if st.button(
-                    "🗑️",
-                    key=f"delete_{resource['id']}",
-                ):
-                    self.delete_resource(resource["id"])
-                    st.rerun()
+        # Line between each row
+        st.divider()
