@@ -11,6 +11,11 @@ def energy_potential(environment: Dict[str, Any]) -> Dict[str, Any]:
 
 def build_decision(environment, resources):
     energy = energy_potential(environment)
+    allocations = allocate_energy(
+        environment,
+        resources,
+        energy,
+    )
     ranked = []
     for resource in resources:
         quantity = max(float(resource["quantity"]), 0)
@@ -29,4 +34,80 @@ def build_decision(environment, resources):
     else:
         actions.append({"title": "Conserve and store energy", "detail": "Renewable output is moderate or low, so defer flexible loads and protect the battery reserve.", "type": "energy"})
     actions.append({"title": "Store remaining energy", "detail": "Keep surplus in storage for the next low-production period and overnight demand.", "type": "storage"})
-    return {"environment": environment, "energy": energy, "resources": ranked, "recommendations": actions}
+    return {
+        "environment": environment,
+        "energy": energy,
+        "energy_allocation": allocations,
+        "resources": ranked,
+        "recommendations": actions,
+    }
+
+def allocate_energy(environment, resources, energy):
+    """
+    Automatically decides how available renewable energy
+    should be distributed across island operations.
+    """
+
+    total_kw = energy["total_kw"]
+
+    # Find important resources
+    water = next(
+        (
+            resource
+            for resource in resources
+            if "water" in resource["name"].lower()
+        ),
+        None,
+    )
+
+    # Starting allocations
+    allocations = {
+        "💧 Water / Desalination": 30,
+        "🏥 Emergency Systems": 25,
+        "🏠 Essential Housing": 25,
+        "🔋 Battery Storage": 20,
+    }
+
+    # -----------------------------
+    # WATER CONDITIONS
+    # -----------------------------
+
+    if water and water["quantity"] < 500:
+        allocations["💧 Water / Desalination"] += 20
+        allocations["🔋 Battery Storage"] -= 10
+        allocations["🏠 Essential Housing"] -= 10
+
+    # -----------------------------
+    # HIGH TEMPERATURE
+    # -----------------------------
+
+    if environment["temperature"] >= 28:
+        allocations["🏠 Essential Housing"] += 10
+        allocations["🔋 Battery Storage"] -= 10
+
+    # -----------------------------
+    # WEATHER / LOW ENERGY
+    # -----------------------------
+
+    if environment["weather"] == "Cloudy":
+        allocations["🔋 Battery Storage"] += 10
+        allocations["🏠 Essential Housing"] -= 5
+        allocations["💧 Water / Desalination"] -= 5
+
+    # Make sure nothing is negative
+    for system in allocations:
+        allocations[system] = max(0, allocations[system])
+
+    # Calculate kW for each system
+    results = []
+
+    for system, percent in allocations.items():
+        results.append(
+            {
+                "system": system,
+                "percent": percent,
+                "kw": round(total_kw * percent / 100, 2),
+            }
+        )
+
+    return results

@@ -3,9 +3,7 @@
 import uuid
 import streamlit as st
 
-
 class ResourceManager:
-
     def __init__(self):
         if "resources" not in st.session_state:
             st.session_state.resources = [
@@ -46,18 +44,13 @@ class ResourceManager:
                     "priority": 5,
                 },
             ]
-
-    # -----------------------------
     # BACKEND: Get resources
     # -----------------------------
-
     def get_all_resources(self):
         return st.session_state.resources
 
-    # -----------------------------
     # BACKEND: Add resource
     # -----------------------------
-
     def add_resource(
         self,
         name,
@@ -79,11 +72,8 @@ class ResourceManager:
 
         st.session_state.resources.append(new_resource)
         return new_resource
-
     # -----------------------------
     # BACKEND: Update resource
-    # -----------------------------
-
     def update_resource(
         self,
         resource_id,
@@ -113,8 +103,6 @@ class ResourceManager:
 
     # -----------------------------
     # BACKEND: Delete resource
-    # -----------------------------
-
     def delete_resource(self, resource_id):
         for resource in st.session_state.resources:
             if resource["id"] == resource_id:
@@ -125,43 +113,34 @@ class ResourceManager:
 
     # -----------------------------
     # FRONTEND: Add Resource Dialog
-    # -----------------------------
-
     def show_add_dialog(self):
 
         @st.dialog("Add Resource")
         def add_dialog():
-
             with st.form("add_resource_form"):
                 name = st.text_input("Resource Name")
-
                 category = st.selectbox(
                     "Category",
                     ["Water", "Food", "Fuel", "Energy", "Medical", "Other"],
                 )
-
                 quantity = st.number_input(
                     "Quantity",
                     min_value=0.0,
                     value=0.0,
                 )
-
                 unit = st.text_input("Unit")
 
                 horizon = st.text_input(
                     "Estimated Horizon",
                     placeholder="Example: 7 days",
                 )
-
                 priority = st.slider(
                     "Priority",
                     min_value=1,
                     max_value=10,
                     value=5,
                 )
-
                 submitted = st.form_submit_button("Add Resource")
-
                 if submitted:
                     if name.strip() and unit.strip():
 
@@ -175,7 +154,6 @@ class ResourceManager:
                         )
 
                         st.rerun()
-
                     else:
                         st.error(
                             "Please enter a resource name and unit."
@@ -185,20 +163,15 @@ class ResourceManager:
 
     # -----------------------------
     # FRONTEND: Edit Resource Dialog
-    # -----------------------------
-
     def show_edit_dialog(self, resource):
 
         @st.dialog("Edit Resource")
         def edit_dialog():
-
             with st.form(f"edit_form_{resource['id']}"):
-
                 name = st.text_input(
                     "Resource Name",
                     value=resource["name"],
                 )
-
                 category_options = [
                     "Water",
                     "Food",
@@ -207,51 +180,42 @@ class ResourceManager:
                     "Medical",
                     "Other",
                 ]
-
                 current_category = resource.get(
                     "category",
                     "Other",
                 )
-
                 category_index = (
                     category_options.index(current_category)
                     if current_category in category_options
                     else len(category_options) - 1
                 )
-
                 category = st.selectbox(
                     "Category",
                     category_options,
                     index=category_index,
                 )
-
                 quantity = st.number_input(
                     "Quantity",
                     min_value=0.0,
                     value=float(resource["quantity"]),
                 )
-
                 unit = st.text_input(
                     "Unit",
                     value=resource["unit"],
                 )
-
                 horizon = st.text_input(
                     "Estimated Horizon",
                     value=resource.get("horizon", ""),
                 )
-
                 priority = st.slider(
                     "Priority",
                     min_value=1,
                     max_value=10,
                     value=int(resource["priority"]),
                 )
-
                 submitted = st.form_submit_button(
                     "Save Changes"
                 )
-
                 if submitted:
 
                     self.update_resource(
@@ -270,12 +234,8 @@ class ResourceManager:
 
     # -----------------------------
     # FRONTEND: Resource Ledger
-    # -----------------------------
-
     def show_resource_ledger(self):
-
         st.subheader("RESOURCE LEDGER")
-
         st.caption(
             "Manage island supplies and set priority levels for the "
             "decision engine."

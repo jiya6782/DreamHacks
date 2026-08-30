@@ -129,6 +129,37 @@ energy_cols[2].metric(
     f"{energy['total_kw']} kW"
 )
 
+# --------------------------------------------------
+# Live Energy Allocation
+# --------------------------------------------------
+
+st.subheader("⚡ Live Energy Allocation")
+
+st.caption(
+    "The automation system distributes available renewable "
+    "energy based on current environmental and resource conditions."
+)
+
+st.metric(
+    "TOTAL AVAILABLE ENERGY",
+    f"{energy['total_kw']} kW"
+)
+
+for allocation in decision["energy_allocation"]:
+
+    col1, col2, col3 = st.columns([3, 2, 1])
+
+    with col1:
+        st.write(f"**{allocation['system']}**")
+
+    with col2:
+        st.progress(allocation["percent"] / 100)
+
+    with col3:
+        st.write(
+            f"{allocation['percent']}% "
+            f"({allocation['kw']} kW)"
+        )
 
 # --------------------------------------------------
 # Resource Ledger
