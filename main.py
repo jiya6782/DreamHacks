@@ -5,9 +5,9 @@ from environmental_simulator import EnvironmentalSimulator
 from resource_manager import ResourceManager
 
 
-# --------------------------------------------------
-# App configuration
-# --------------------------------------------------
+# ==========================================================
+# APP CONFIGURATION
+# ==========================================================
 
 st.set_page_config(
     page_title="Island Resource Dashboard",
@@ -16,9 +16,9 @@ st.set_page_config(
 )
 
 
-# --------------------------------------------------
-# Simulation state
-# --------------------------------------------------
+# ==========================================================
+# SIMULATION STATE
+# ==========================================================
 
 @st.cache_resource
 def get_simulator():
@@ -28,35 +28,45 @@ def get_simulator():
 simulator = get_simulator()
 
 
-# --------------------------------------------------
-# Resource manager
-# --------------------------------------------------
+# ==========================================================
+# RESOURCE MANAGER
+# ==========================================================
+
 resource_manager = ResourceManager()
 
 
-# --------------------------------------------------
-# Header
-# --------------------------------------------------
+# ==========================================================
+# HEADER
+# ==========================================================
 
 st.title("🌱 Island Resource Dashboard")
-st.caption("Simulation-first environmental resource management")
+
+st.caption(
+    "Simulation-first environmental resource management"
+)
 
 
-# --------------------------------------------------
-# Controls
-# --------------------------------------------------
+# ==========================================================
+# CONTROLS
+# ==========================================================
 
 col1, col2 = st.columns([1, 4])
 
 with col1:
-    if st.button("🔄 Advance Simulation", use_container_width=True):
+
+    if st.button(
+        "🔄 Advance Simulation",
+        use_container_width=True,
+    ):
+
         simulator.advance()
+
         st.rerun()
 
 
-# --------------------------------------------------
-# Get current data
-# --------------------------------------------------
+# ==========================================================
+# GET CURRENT DATA
+# ==========================================================
 
 environment = simulator.snapshot()
 
@@ -68,9 +78,9 @@ decision = build_decision(
 )
 
 
-# --------------------------------------------------
-# Simulation status
-# --------------------------------------------------
+# ==========================================================
+# SIMULATION STATUS
+# ==========================================================
 
 st.subheader("Simulation Status")
 
@@ -78,35 +88,90 @@ cols = st.columns(5)
 
 cols[0].metric(
     "Solar Radiation",
-    f"{environment['solar_radiation']} W/m²"
+    f"{environment['solar_radiation']} W/m²",
 )
 
 cols[1].metric(
     "Wind Speed",
-    f"{environment['wind_speed']} m/s"
+    f"{environment['wind_speed']} m/s",
 )
 
 cols[2].metric(
     "Temperature",
-    f"{environment['temperature']} °C"
+    f"{environment['temperature']} °C",
 )
 
 cols[3].metric(
     "Weather",
-    environment["weather"]
+    environment["weather"],
 )
 
 cols[4].metric(
     "Time",
-    environment["time_of_day"]
+    environment["time_of_day"],
 )
 
 
-# --------------------------------------------------
-# Renewable energy
-# --------------------------------------------------
+# ==========================================================
+# ENVIRONMENTAL EVENT DETECTION
+# ==========================================================
 
-st.subheader("⚡ Renewable Energy Potential")
+st.subheader("🌎 Environmental Assessment")
+
+event = decision["event"]
+
+
+if event["event"] == "Normal":
+
+    st.success(
+        f"🟢 NORMAL CONDITIONS\n\n"
+        f"{event['reason']}"
+    )
+
+else:
+
+    if event["severity"] == "High":
+
+        st.error(
+            f"🔴 {event['event'].upper()} DETECTED"
+        )
+
+    else:
+
+        st.warning(
+            f"🟡 {event['event'].upper()} DETECTED"
+        )
+
+    st.write(
+        f"**Detection confidence:** "
+        f"{event['confidence']}%"
+    )
+
+    st.write(
+        f"**Assessment:** "
+        f"{event['reason']}"
+    )
+
+    if event["signals"]:
+
+        st.write(
+            "**Environmental signals:**"
+        )
+
+        for signal in event["signals"]:
+
+            st.write(
+                f"✓ {signal}"
+            )
+
+
+# ==========================================================
+# RENEWABLE ENERGY
+# ==========================================================
+
+st.subheader(
+    "⚡ Renewable Energy Potential"
+)
 
 energy = decision["energy"]
 
@@ -115,69 +180,119 @@ energy_cols = st.columns(3)
 energy_cols[0].metric(
     "☀️ Solar",
     f"{energy['solar_kw']} kW",
-    energy["solar_level"]
+    energy["solar_level"],
 )
 
 energy_cols[1].metric(
     "🌬️ Wind",
     f"{energy['wind_kw']} kW",
-    energy["wind_level"]
+    energy["wind_level"],
 )
 
 energy_cols[2].metric(
     "⚡ Total Available",
-    f"{energy['total_kw']} kW"
+    f"{energy['total_kw']} kW",
 )
 
-# --------------------------------------------------
-# Live Energy Allocation
-# --------------------------------------------------
 
-st.subheader("⚡ Live Energy Allocation")
+# ==========================================================
+# AUTOMATED ENERGY ALLOCATION
+# ==========================================================
+
+st.subheader(
+    "⚡ Automated Energy Allocation"
+)
 
 st.caption(
-    "The automation system distributes available renewable "
-    "energy based on current environmental and resource conditions."
+    "The decision engine automatically redistributes "
+    "renewable energy based on environmental conditions."
 )
 
-st.metric(
-    "TOTAL AVAILABLE ENERGY",
-    f"{energy['total_kw']} kW"
+allocation_cols = st.columns(
+    len(decision["energy_allocation"])
 )
 
-for allocation in decision["energy_allocation"]:
+for column, allocation in zip(
+    allocation_cols,
+    decision["energy_allocation"],
+):
 
-    col1, col2, col3 = st.columns([3, 2, 1])
+    with column:
 
-    with col1:
-        st.write(f"**{allocation['system']}**")
-
-    with col2:
-        st.progress(allocation["percent"] / 100)
-
-    with col3:
-        st.write(
-            f"{allocation['percent']}% "
-            f"({allocation['kw']} kW)"
+        st.metric(
+            allocation["system"],
+            f"{allocation['kw']} kW",
+            f"{allocation['percent']}%",
         )
 
-# --------------------------------------------------
-# Resource Ledger
-# --------------------------------------------------
+
+# ==========================================================
+# RESOURCE LEDGER
+# ==========================================================
 
 resource_manager.show_resource_ledger()
 
-# --------------------------------------------------
-# Recommended actions
-# --------------------------------------------------
 
-st.subheader("🤖 Recommended Next Actions")
+# ==========================================================
+# ADAPTIVE RESOURCE PRIORITIES
+# ==========================================================
+
+st.subheader(
+    "🤖 Adaptive Resource Priorities"
+)
+
+if event["event"] == "Normal":
+
+    st.info(
+        "No environmental event is currently "
+        "altering resource priorities."
+    )
+
+else:
+
+    st.write(
+        f"Because **{event['event']}** conditions "
+        f"were detected, the decision engine has "
+        f"automatically adjusted resource importance."
+    )
+
+    for resource in decision["resources"]:
+
+        base = resource["priority"]
+
+        boost = resource.get(
+            "event_boost",
+            0,
+        )
+
+        if boost > 0:
+
+            st.write(
+                f"**{resource['name']}** — "
+                f"Base priority {base}/10 "
+                f"→ **+{boost} event priority** "
+                f"→ Decision score **{resource['score']}**"
+            )
+
+
+# ==========================================================
+# RECOMMENDED ACTIONS
+# ==========================================================
+
+st.subheader(
+    "🤖 Recommended Next Actions"
+)
 
 for i, recommendation in enumerate(
     decision["recommendations"],
     start=1,
 ):
+
     st.markdown(
-        f"### {i}. {recommendation['title']}"
+        f"### {i}. "
+        f"{recommendation['title']}"
     )
-    st.write(recommendation["detail"])
+
+    st.write(
+        recommendation["detail"]
+    )
