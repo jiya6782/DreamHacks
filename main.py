@@ -2,6 +2,7 @@ import streamlit as st
 
 from decision_engine import build_decision
 from environmental_simulator import EnvironmentalSimulator
+from resource_manager import ResourceManager
 
 
 # --------------------------------------------------
@@ -28,36 +29,15 @@ simulator = get_simulator()
 
 
 # --------------------------------------------------
-# Resources
+# Resource manager
 # --------------------------------------------------
 
-if "resources" not in st.session_state:
-    st.session_state.resources = [
-        {
-            "name": "Water",
-            "quantity": 420,
-            "unit": "L",
-            "priority": 10,
-        },
-        {
-            "name": "Food",
-            "quantity": 160,
-            "unit": "kg",
-            "priority": 7,
-        },
-        {
-            "name": "Fuel",
-            "quantity": 85,
-            "unit": "L",
-            "priority": 6,
-        },
-        {
-            "name": "General supplies",
-            "quantity": 34,
-            "unit": "boxes",
-            "priority": 5,
-        },
-    ]
+@st.cache_resource
+def get_resource_manager():
+    return ResourceManager()
+
+
+resource_manager = get_resource_manager()
 
 
 # --------------------------------------------------
@@ -81,12 +61,16 @@ with col1:
 
 
 # --------------------------------------------------
-# Current decision
+# Get current data
 # --------------------------------------------------
 
+environment = simulator.snapshot()
+
+resources = resource_manager.get_all_resources()
+
 decision = build_decision(
-    simulator.snapshot(),
-    st.session_state.resources,
+    environment,
+    resources,
 )
 
 
@@ -96,96 +80,103 @@ decision = build_decision(
 
 st.subheader("Simulation Status")
 
-status = simulator.snapshot()
+cols = st.columns(5)
 
-if isinstance(status, dict):
-    cols = st.columns(len(status))
+cols[0].metric(
+    "Solar Radiation",
+    f"{environment['solar_radiation']} W/m²"
+)
 
-    for column, (key, value) in zip(cols, status.items()):
-        with column:
-            st.metric(
-                label=str(key).replace("_", " ").title(),
-                value=str(value),
-            )
-else:
-    st.write(status)
+cols[1].metric(
+    "Wind Speed",
+    f"{environment['wind_speed']} m/s"
+)
 
+cols[2].metric(
+    "Temperature",
+    f"{environment['temperature']} °C"
+)
 
-# --------------------------------------------------
-# Resources
-# --------------------------------------------------
+cols[3].metric(
+    "Weather",
+    environment["weather"]
+)
 
-st.subheader("Resources")
-
-for resource in st.session_state.resources:
-    name = resource.get("name", "Unknown")
-    quantity = resource.get("quantity", 0)
-    unit = resource.get("unit", "")
-    priority = resource.get("priority", 0)
-
-    col1, col2, col3 = st.columns([2, 2, 1])
-
-    with col1:
-        st.write(f"**{name}**")
-
-    with col2:
-        st.write(f"{quantity} {unit}")
-
-    with col3:
-        st.write(f"Priority: {priority}")
+cols[4].metric(
+    "Time",
+    environment["time_of_day"]
+)
 
 
 # --------------------------------------------------
-# Energy
+# Renewable energy
 # --------------------------------------------------
 
 st.subheader("⚡ Renewable Energy Potential")
 
 energy = decision["energy"]
 
-col1, col2, col3 = st.columns(3)
+energy_cols = st.columns(3)
 
-col1.metric(
-    "Solar",
-    f'{energy["solar_kw"]} kW',
+energy_cols[0].metric(
+    "☀️ Solar",
+    f"{energy['solar_kw']} kW",
     energy["solar_level"]
 )
 
-col2.metric(
-    "Wind",
-    f'{energy["wind_kw"]} kW',
+energy_cols[1].metric(
+    "🌬️ Wind",
+    f"{energy['wind_kw']} kW",
     energy["wind_level"]
 )
 
-col3.metric(
-    "Total Available",
-    f'{energy["total_kw"]} kW'
+energy_cols[2].metric(
+    "⚡ Total Available",
+    f"{energy['total_kw']} kW"
 )
 
 
 # --------------------------------------------------
-# Recommended Actions
+# Resources
 # --------------------------------------------------
 
-st.subheader("📋 Recommended Next Actions")
+st.subheader("📦 Resource Ledger")
 
-for i, recommendation in enumerate(decision["recommendations"], start=1):
-    st.markdown(f"### {i}. {recommendation['title']}")
-    st.write(recommendation["detail"])
+for resource in resources:
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.write(f"**{resource['name']}**")
+
+    with col2:
+        st.write(
+            f"{resource['quantity']} "
+            f"{resource['unit']}"
+        )
+
+    with col3:
+        st.write(
+            f"Priority: {resource['priority']}/10"
+        )
+
+    with col4:
+        st.write(
+            resource.get("category", "Other")
+        )
 
 
 # --------------------------------------------------
-# Resource editor
+# Recommended actions
 # --------------------------------------------------
 
-with st.expander("Edit Resources"):
-    edited_resources = st.data_editor(
-        st.session_state.resources,
-        num_rows="dynamic",
-        use_container_width=True,
+st.subheader("🤖 Recommended Next Actions")
+
+for i, recommendation in enumerate(
+    decision["recommendations"],
+    start=1,
+):
+    st.markdown(
+        f"### {i}. {recommendation['title']}"
     )
-
-    if st.button("Save Resources"):
-        st.session_state.resources = edited_resources
-        st.success("Resources updated.")
-        st.rerun()
+    st.write(recommendation["detail"])
