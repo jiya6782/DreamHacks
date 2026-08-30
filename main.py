@@ -136,34 +136,10 @@ energy_cols[2].metric(
 
 
 # --------------------------------------------------
-# Resources
+# Resource Ledger
 # --------------------------------------------------
 
-st.subheader("📦 Resource Ledger")
-
-for resource in resources:
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        st.write(f"**{resource['name']}**")
-
-    with col2:
-        st.write(
-            f"{resource['quantity']} "
-            f"{resource['unit']}"
-        )
-
-    with col3:
-        st.write(
-            f"Priority: {resource['priority']}/10"
-        )
-
-    with col4:
-        st.write(
-            resource.get("category", "Other")
-        )
-
+resource_manager.show_resource_ledger()
 
 # --------------------------------------------------
 # Recommended actions
