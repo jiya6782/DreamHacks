@@ -31,12 +31,7 @@ simulator = get_simulator()
 # --------------------------------------------------
 # Resource manager
 # --------------------------------------------------
-
-@st.cache_resource
-def get_resource_manager():
-    return ResourceManager()
-
-resource_manager = get_resource_manager()
+resource_manager = ResourceManager()
 
 
 # --------------------------------------------------
