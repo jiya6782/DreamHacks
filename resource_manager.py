@@ -5,6 +5,7 @@ import streamlit as st
 
 
 class ResourceManager:
+
     def __init__(self):
         if "resources" not in st.session_state:
             st.session_state.resources = [
@@ -270,92 +271,87 @@ class ResourceManager:
     # -----------------------------
     # FRONTEND: Resource Ledger
     # -----------------------------
+
     def show_resource_ledger(self):
 
-    st.subheader("RESOURCE LEDGER")
+        st.subheader("RESOURCE LEDGER")
 
-    st.caption(
-        "Manage island supplies and set priority levels for the "
-        "decision engine."
-    )
+        st.caption(
+            "Manage island supplies and set priority levels for the "
+            "decision engine."
+        )
 
-    # Add resource button
-    if st.button("＋ Add Resource"):
-        self.show_add_dialog()
+        if st.button("＋ Add Resource"):
+            self.show_add_dialog()
 
-    st.divider()
+        st.divider()
 
-    # Table header
-    header = st.columns([2.4, 1.3, 1.5, 1.3, 1, 0.5, 0.5])
-
-    with header[0]:
-        st.markdown("**RESOURCE LINE**")
-
-    with header[1]:
-        st.markdown("**CATEGORY**")
-
-    with header[2]:
-        st.markdown("**ON HAND**")
-
-    with header[3]:
-        st.markdown("**HORIZON**")
-
-    with header[4]:
-        st.markdown("**PRIORITY**")
-
-    st.divider()
-
-    # Table rows
-    for resource in self.get_all_resources():
-
-        cols = st.columns(
+        # Table headers
+        header = st.columns(
             [2.4, 1.3, 1.5, 1.3, 1, 0.5, 0.5]
         )
 
-        # Resource name + ID
-        with cols[0]:
-            st.markdown(f"**{resource['name']}**")
-            st.caption(f"ID: {resource['id'][:8]}")
+        with header[0]:
+            st.markdown("**RESOURCE LINE**")
 
-        # Category
-        with cols[1]:
-            st.write(resource.get("category", "Other"))
+        with header[1]:
+            st.markdown("**CATEGORY**")
 
-        # Quantity
-        with cols[2]:
-            st.markdown(
-                f"**{resource['quantity']}** "
-                f"{resource['unit']}"
-            )
+        with header[2]:
+            st.markdown("**ON HAND**")
 
-        # Horizon
-        with cols[3]:
-            st.write(resource.get("horizon", "—"))
+        with header[3]:
+            st.markdown("**HORIZON**")
 
-        # Priority
-        with cols[4]:
-            st.markdown(
-                f"**P{resource['priority']}** / 10"
-            )
+        with header[4]:
+            st.markdown("**PRIORITY**")
 
-        # Edit
-        with cols[5]:
-            if st.button(
-                "✏️",
-                key=f"edit_{resource['id']}",
-                help="Edit resource",
-            ):
-                self.show_edit_dialog(resource)
-
-        # Delete
-        with cols[6]:
-            if st.button(
-                "🗑️",
-                key=f"delete_{resource['id']}",
-                help="Delete resource",
-            ):
-                self.delete_resource(resource["id"])
-                st.rerun()
-
-        # Line between each row
         st.divider()
+
+        # Table rows
+        for resource in self.get_all_resources():
+
+            cols = st.columns(
+                [2.4, 1.3, 1.5, 1.3, 1, 0.5, 0.5]
+            )
+
+            with cols[0]:
+                st.markdown(f"**{resource['name']}**")
+                st.caption(f"ID: {resource['id'][:8]}")
+
+            with cols[1]:
+                st.write(resource.get("category", "Other"))
+
+            with cols[2]:
+                st.markdown(
+                    f"**{resource['quantity']}** "
+                    f"{resource['unit']}"
+                )
+
+            with cols[3]:
+                st.write(resource.get("horizon", "—"))
+
+            with cols[4]:
+                st.markdown(
+                    f"**P{resource['priority']}** / 10"
+                )
+
+            with cols[5]:
+                if st.button(
+                    "✏️",
+                    key=f"edit_{resource['id']}",
+                    help="Edit resource",
+                ):
+                    self.show_edit_dialog(resource)
+
+            with cols[6]:
+                if st.button(
+                    "🗑️",
+                    key=f"delete_{resource['id']}",
+                    help="Delete resource",
+                ):
+                    self.delete_resource(resource["id"])
+                    st.rerun()
+
+            # Line separating each row
+            st.divider()
