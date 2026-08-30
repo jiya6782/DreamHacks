@@ -2,6 +2,7 @@
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -62,8 +63,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
 		return
 
 
-def run(host="127.0.0.1", port=8000):
-	server = ThreadingHTTPServer((host, port), DashboardHandler)
+def run(host=None, port=None):
+	host = host or os.environ.get("HOST", "0.0.0.0")
+	port = int(port or os.environ.get("PORT", "8000"))
+	try:
+		server = ThreadingHTTPServer((host, port), DashboardHandler)
+	except OSError as error:
+		raise OSError(
+			f"Could not bind dashboard to {host}:{port}. "
+			"Set PORT to an available port or stop the process using it."
+		) from error
 	print(f"Island resource dashboard: http://{host}:{port}")
 	try:
 		server.serve_forever()

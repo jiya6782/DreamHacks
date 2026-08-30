@@ -8,7 +8,7 @@ Simulation-first environmental resource management for an isolated island. The s
 python main.py
 ```
 
-Open http://127.0.0.1:8000. Each refresh advances the simulated clock by one hour and recomputes renewable energy potential, resource rankings, and explained actions. Resource quantities and priorities can be edited in the dashboard.
+Open http://127.0.0.1:8000 locally. The server listens on `0.0.0.0` and uses the hosting platform's `PORT` environment variable when provided. Each refresh advances the simulated clock by one hour and recomputes renewable energy potential, resource rankings, and explained actions. Resource quantities and priorities can be edited in the dashboard.
 
 ## Test
 
